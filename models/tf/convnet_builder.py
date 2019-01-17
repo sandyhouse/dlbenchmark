@@ -239,11 +239,7 @@ class ConvNetBuilder(object):
     if input_layer is None:
       input_layer = self.top_layer
     self.top_layer = tf.reshape(input_layer, shape)
-    #self.top_size = shape[-1]  # HACK This may not always work
-    if self.data_format == "NHWC":
-      self.top_size = shape[-1] 
-    else:
-      self.top_size = shape[-3]
+    self.top_size = shape[-1]  # HACK This may not always work
     return self.top_layer
 
   def affine(self,
