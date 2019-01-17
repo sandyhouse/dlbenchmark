@@ -21,7 +21,7 @@ from __future__ import print_function
 from collections import namedtuple
 
 import tensorflow as tf
-import tensorflow.convnet_builder
+import tf.convnet_builder
 
 # BuildNetworkResult encapsulate the result (e.g. logits) of a
 # Model.build_network() call.
