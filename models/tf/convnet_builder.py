@@ -27,7 +27,6 @@ import tensorflow as tf
 from tensorflow.python.layers import convolutional as conv_layers
 from tensorflow.python.layers import core as core_layers
 from tensorflow.python.layers import pooling as pooling_layers
-from tensorflow.python.layers import fully_connected as fc_layers
 from tensorflow.python.training import moving_averages
 
 class ConvNetBuilder(object):
@@ -258,7 +257,8 @@ class ConvNetBuilder(object):
     with tf.variable_scope(name) as scope:
       init_factor = 2. if activation == 'relu' else 1.
       stddev = stddev or np.sqrt(init_factor / num_channels_in)
-      affine1 = fc_layers(input_layer, num_out_channels, activation, 
+      affine1 = tf.contrib.layers.fully_connected(input_layer, num_out_channels, 
+            activation, 
             weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
             biases_initializer=tf.constant_initializer(bias),
             scope=scope)
