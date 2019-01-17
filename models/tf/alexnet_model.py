@@ -33,7 +33,7 @@ class AlexnetModel(model.CNNModel):
 
   def __init__(self, params=None):
     super(AlexnetModel, self).__init__(
-        'alexnet', 224 + 3, 512, 0.005, params=params)
+        'alexnet', 224, 512, 0.005, params=params)
 
   def add_inference(self, cnn):
     # Note: VALID requires padding the images by 3 in width and height
