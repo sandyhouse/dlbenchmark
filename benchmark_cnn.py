@@ -1212,13 +1212,9 @@ def get_learning_rate(params, global_step, num_examples_per_epoch, model,
 def get_optimizer(params, learning_rate):
   """Returns the optimizer that should be used based on params."""
   if params.optimizer == 'momentum':
-    mlperf.logger.log(key=mlperf.tags.OPT_NAME,
-                      value=mlperf.tags.SGD_WITH_MOMENTUM)
-    mlperf.logger.log(key=mlperf.tags.OPT_MOMENTUM, value=params.momentum)
     opt = tf.train.MomentumOptimizer(
         learning_rate, params.momentum, use_nesterov=True)
   elif params.optimizer == 'sgd':
-    #mlperf.logger.log(key=mlperf.tags.OPT_NAME, value=mlperf.tags.SGD)
     opt = tf.train.GradientDescentOptimizer(learning_rate)
   elif params.optimizer == 'rmsprop':
     opt = tf.train.RMSPropOptimizer(
