@@ -125,15 +125,13 @@ class ConvNetBuilder(object):
       if self.data_format == 'NCHW':
         strides = [strides[0], strides[3], strides[1], strides[2]]
       if mode != 'SAME_RESNET':
-        conv = conv_layers.conv2d(input_layer, num_channels_in, 
-                                  num_out_channels,
+        conv = conv_layers.conv2d(input_layer, num_out_channels,
                                   kernel_size=[k_height, k_width],
                                   strides=[d_height, d_width], padding=mode,
                                   kernel_initializer=kernel_initializer)
       else:  # Special padding mode for ResNet models
         if d_height == 1 and d_width == 1:
-          conv = conv_layers.conv2d(input_layer, num_channels_in,
-                                    num_out_channels,
+          conv = conv_layers.conv2d(input_layer, num_out_channels,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width], padding='SAME',
                                     kernel_initializer=kernel_initializer)
@@ -150,8 +148,7 @@ class ConvNetBuilder(object):
           if self.data_format == 'NCHW':
             padding = [padding[0], padding[3], padding[1], padding[2]]
           padded_input_layer = tf.pad(input_layer, padding)
-          conv = conv_layers.conv2d(padded_input_layer, num_channels_in,
-                                    num_out_channels,
+          conv = conv_layers.conv2d(padded_input_layer, num_out_channels,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width],
                                     padding='VALID',
@@ -256,6 +253,14 @@ class ConvNetBuilder(object):
     self.counts['affine'] += 1
     with tf.variable_scope(name) as scope:
       init_factor = 2. if activation == 'relu' else 1.
+      if activation == 'relu':
+        activation = tf.nn.relu
+      elif activation == 'linear' or activation == None:
+        activation = None
+      elif activation == 'softmax':
+        activation = tf.nn.softmax
+      else:
+        raise ValueError("Not supported activation: %s\n", activation)
       stddev = stddev or np.sqrt(init_factor / num_channels_in)
       affine1 = tf.contrib.layers.fully_connected(input_layer, num_out_channels, 
             activation, 
@@ -324,10 +329,10 @@ class ConvNetBuilder(object):
       dropout = core_layers.dropout(input_layer, 1. - keep_prob,
                                     training=self.phase_train)
       self.top_layer = dropout
-      if self.data_format == 'NHWC':
-        self.top_size = dropout.shape[3]
-      else:
-        self.top_size = dropout.shape[1]
+      #if self.data_format == 'NHWC':
+      #  self.top_size = dropout.shape[3]
+      #else:
+      #  self.top_size = dropout.shape[1]
       return dropout
 
   def _batch_norm_without_layers(self, input_layer, decay, use_scale, epsilon):

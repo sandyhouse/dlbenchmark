@@ -37,7 +37,7 @@ from __future__ import print_function
 import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-import model as model_lib
+from models import model as model_lib
 
 IMAGENET_NUM_TRAIN_IMAGES = 1281167
 
