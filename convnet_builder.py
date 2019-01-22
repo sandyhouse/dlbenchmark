@@ -135,6 +135,7 @@ class ConvNetBuilder(object):
           conv = conv_layers.conv2d(input_layer, num_out_channels,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width], padding='SAME',
+                                    data_format = self.channel_pos,
                                     kernel_initializer=kernel_initializer)
         else:
           rate = 1  # Unused (for 'a trous' convolutions)
@@ -153,6 +154,7 @@ class ConvNetBuilder(object):
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width],
                                     padding='VALID',
+                                    data_format = self.channel_pos,
                                     kernel_initializer=kernel_initializer)
       if use_batch_norm is None:
         use_batch_norm = self.use_batch_norm
