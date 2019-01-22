@@ -128,6 +128,7 @@ class ConvNetBuilder(object):
         conv = conv_layers.conv2d(input_layer, num_out_channels,
                                   kernel_size=[k_height, k_width],
                                   strides=[d_height, d_width], padding=mode,
+                                  data_format = self.channel_pos,
                                   kernel_initializer=kernel_initializer)
       else:  # Special padding mode for ResNet models
         if d_height == 1 and d_width == 1:

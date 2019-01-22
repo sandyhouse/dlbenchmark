@@ -108,15 +108,6 @@ InputProcessingInfo = namedtuple(
 flags.DEFINE_string('model', 'trivial',
                     'Name of the model to run, the list of supported models '
                     'are defined in models/model.py')
-# The code will first check if it's running under benchmarking mode
-# or evaluation mode, depending on 'eval':
-# Under the evaluation mode, this script will read a saved model,
-#   and compute the accuracy of the model against a validation dataset.
-#   Additional ops for accuracy and top_k predictors are only used under
-#   this mode.
-# Under the benchmarking mode, user can specify whether nor not to use
-#   the forward-only option, which will only compute the loss function.
-#   forward-only cannot be enabled with eval at the same time.
 flags.DEFINE_integer('eval_interval_secs', 0,
                      'How often to run eval on saved checkpoints. Usually the '
                      'same as save_model_secs from the corresponding training '
@@ -1866,7 +1857,7 @@ class BenchmarkCNN(object):
       return accuracy_at_1, accuracy_at_5
 
   def _benchmark_train(self):
-    """Run cnn in benchmark mode. Skip the backward pass if forward_only is on.
+    """Run cnn in benchmark mode.
 
     Returns:
       Dictionary containing training statistics (num_workers, num_steps,
@@ -3110,7 +3101,7 @@ class BenchmarkCNN(object):
       return results
 
     with tf.device(self.devices[rel_device_num]):
-      outputs = maybe_compile(forward_pass_and_gradients, self.params)
+      outputs = forward_pass_and_gradients()
       logits, loss, grads = unpack_forward_pass_and_gradients_output(outputs)
       return make_results(logits, loss, grads)
 
@@ -3273,6 +3264,3 @@ def setup(params):
 
   return params
 
-
-def maybe_compile(computation, params):
-  return computation()
