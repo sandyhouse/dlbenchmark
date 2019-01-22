@@ -190,7 +190,7 @@ def normalized_image(images):
   # Rescale from [0, 255] to [0, 2]
   images = tf.multiply(images, 1. / 127.5)
   # Rescale to [-1, 1]
-  mlperf.logger.log(key=mlperf.tags.INPUT_MEAN_SUBTRACTION, value=[1.0] * 3)
+  #mlperf.logger.log(key=mlperf.tags.INPUT_MEAN_SUBTRACTION, value=[1.0] * 3)
   return tf.subtract(images, 1.0)
 
 
@@ -253,8 +253,8 @@ def eval_image(image,
                             tf.int32)
     resize_width = tf.cast(image_width_float * max_ratio * scale_factor,
                            tf.int32)
-    mlperf.logger.log_input_resize_aspect_preserving(height, width,
-                                                     scale_factor)
+    #mlperf.logger.log_input_resize_aspect_preserving(height, width,
+    #                                                 scale_factor)
 
     # Resize the image to shape (`resize_height`, `resize_width`)
     image_resize_method = get_image_resize_method(resize_method, batch_position)
@@ -265,8 +265,8 @@ def eval_image(image,
 
     # Do a central crop of the image to size (height, width).
     # MLPerf requires us to log (height, width) with two different keys.
-    mlperf.logger.log(key=mlperf.tags.INPUT_CENTRAL_CROP, value=[height, width])
-    mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
+    #mlperf.logger.log(key=mlperf.tags.INPUT_CENTRAL_CROP, value=[height, width])
+    #mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
     total_crop_height = (resize_height - height)
     crop_top = total_crop_height // 2
     total_crop_width = (resize_width - width)
@@ -333,14 +333,14 @@ def train_image(image_buffer,
     aspect_ratio_range = [0.75, 1.33]
     area_range = [0.05, 1.0]
     max_attempts = 100
-    mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MIN_OBJ_COV,
-                      value=min_object_covered)
-    mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_RATIO_RANGE,
-                      value=aspect_ratio_range)
-    mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_AREA_RANGE,
-                      value=area_range)
-    mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MAX_ATTEMPTS,
-                      value=max_attempts)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MIN_OBJ_COV,
+    #                  value=min_object_covered)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_RATIO_RANGE,
+    #                  value=aspect_ratio_range)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_AREA_RANGE,
+    #                  value=area_range)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MAX_ATTEMPTS,
+    #                  value=max_attempts)
 
     sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
         tf.image.extract_jpeg_shape(image_buffer),
@@ -373,12 +373,12 @@ def train_image(image_buffer,
                                    dct_method='INTEGER_FAST')
       image = tf.slice(image, bbox_begin, bbox_size)
 
-    mlperf.logger.log(key=mlperf.tags.INPUT_RANDOM_FLIP)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_RANDOM_FLIP)
     distorted_image = tf.image.random_flip_left_right(image)
 
     # This resizing operation may distort the images because the aspect
     # ratio is not respected.
-    mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
+    #mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
     image_resize_method = get_image_resize_method(resize_method, batch_position)
     distorted_image = tf.image.resize_images(
         distorted_image, [height, width],
@@ -627,9 +627,10 @@ class BaseImagePreprocessor(InputPreprocessor):
     image_buffer, label_index, bbox, _ = parse_example_proto(value)
     if self.match_mlperf:
       bbox = tf.zeros((1, 0, 4), dtype=bbox.dtype)
-      mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=False)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=False)
     else:
-      mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=True)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=True)
+      pass
     image = self.preprocess(image_buffer, bbox, batch_position)
     return (image, label_index)
 
@@ -674,7 +675,7 @@ class BaseImagePreprocessor(InputPreprocessor):
       ds = ds.cache()
     if train:
       buffer_size = 10000
-      mlperf.logger.log(key=mlperf.tags.INPUT_SHARD, value=buffer_size)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_SHARD, value=buffer_size)
       ds = ds.apply(
           tf.data.experimental.shuffle_and_repeat(buffer_size=buffer_size))
     else:
@@ -715,8 +716,8 @@ class RecordInputImagePreprocessor(BaseImagePreprocessor):
     # image = tf.cast(image, tf.uint8) # HACK TESTING
 
     if self.match_mlperf:
-      mlperf.logger.log(key=mlperf.tags.INPUT_MEAN_SUBTRACTION,
-                        value=_CHANNEL_MEANS)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_MEAN_SUBTRACTION,
+      #                  value=_CHANNEL_MEANS)
       normalized = image - _CHANNEL_MEANS
     else:
       normalized = normalized_image(image)
@@ -968,7 +969,7 @@ class COCOPreprocessor(BaseImagePreprocessor):
           image=image, boxes=boxes)
       # Random horizontal flip probability is 50%
       # See https://github.com/tensorflow/models/blob/master/research/object_detection/core/preprocessor.py  # pylint: disable=line-too-long
-      mlperf.logger.log(key=mlperf.tags.RANDOM_FLIP_PROBABILITY, value=0.5)
+      #mlperf.logger.log(key=mlperf.tags.RANDOM_FLIP_PROBABILITY, value=0.5)
 
       image = ssd_dataloader.color_jitter(
           image, brightness=0.125, contrast=0.5, saturation=0.5, hue=0.05)
@@ -1050,7 +1051,7 @@ class COCOPreprocessor(BaseImagePreprocessor):
             tf.data.TFRecordDataset,
             cycle_length=datasets_parallel_interleave_cycle_length or 10,
             sloppy=datasets_sloppy_parallel_interleave))
-    mlperf.logger.log(key=mlperf.tags.INPUT_ORDER)
+    #mlperf.logger.log(key=mlperf.tags.INPUT_ORDER)
     if datasets_repeat_cached_sample:
       # Repeat a single sample element indefinitely to emulate memory-speed IO.
       ds = ds.take(1).cache().repeat()
@@ -1059,8 +1060,8 @@ class COCOPreprocessor(BaseImagePreprocessor):
       ds = ds.cache()
     if train:
       ds = ds.apply(tf.data.experimental.shuffle_and_repeat(buffer_size=10000))
-      mlperf.logger.log(key=mlperf.tags.INPUT_SHARD, value=10000)
-      mlperf.logger.log(key=mlperf.tags.INPUT_ORDER)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_SHARD, value=10000)
+      #mlperf.logger.log(key=mlperf.tags.INPUT_ORDER)
     else:
       ds = ds.repeat()
 

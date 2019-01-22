@@ -33,15 +33,13 @@ class AlexnetModel(model.CNNModel):
 
   def __init__(self, params=None):
     super(AlexnetModel, self).__init__(
-        'alexnet', 224, 512, 0.005, params=params)
+        'alexnet', 224 + 3, 512, 0.005, params=params)
 
   def add_inference(self, cnn):
     # Note: VALID requires padding the images by 3 in width and height
-    cnn.conv(96, 11, 11, 4, 4, 'VALID')
+    cnn.conv(64, 11, 11, 4, 4, 'VALID')
     cnn.mpool(3, 3, 2, 2)
-    cnn.lrn(depth_radius=4, bias=2.0, alpha=2e-05, beta=0.75)
-    cnn.conv(256, 5, 5)
-    cnn.lrn(depth_radius=4, bias=2.0, alpha=2e-05, beta=0.75)
+    cnn.conv(192, 5, 5)
     cnn.mpool(3, 3, 2, 2)
     cnn.conv(384, 3, 3)
     cnn.conv(384, 3, 3)

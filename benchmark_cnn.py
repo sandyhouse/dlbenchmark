@@ -48,10 +48,7 @@ import variable_mgr_util
 from cnn_util import log_fn
 from models import model_config
 from platforms import util as platforms_util
-from google.protobuf import text_format
-from tensorflow.contrib.compiler import xla
 from tensorflow.core.protobuf import rewriter_config_pb2
-from tensorflow.python import debug as tf_debug
 from tensorflow.python.client import timeline
 from tensorflow.python.framework import graph_util
 from tensorflow.python.framework import graph_util_impl
@@ -120,16 +117,14 @@ flags.DEFINE_string('model', 'trivial',
 # Under the benchmarking mode, user can specify whether nor not to use
 #   the forward-only option, which will only compute the loss function.
 #   forward-only cannot be enabled with eval at the same time.
-flags.DEFINE_boolean('eval', False, 'whether use eval or benchmarking')
 flags.DEFINE_integer('eval_interval_secs', 0,
                      'How often to run eval on saved checkpoints. Usually the '
                      'same as save_model_secs from the corresponding training '
                      'run. Pass 0 to eval only once.')
 flags.DEFINE_integer('eval_during_training_every_n_steps', None,
                      'Every n steps during training, pause training, run '
-                     'evaluation, then resume training. Must not be used with '
-                     '--eval, as unlike --eval, this option causes both '
-                     'training and eval to be done. This may take slightly '
+                     'evaluation, then resume training. This option causes both'
+                     ' training and eval to be done. This may take slightly '
                      'more GPU memory than running just training or evaluation '
                      'alone. It also may slightly slow down training, even '
                      'when not taking into account the additional time to '
@@ -342,7 +337,7 @@ flags.DEFINE_float('momentum', 0.9, 'Momentum for training.')
 flags.DEFINE_float('rmsprop_decay', 0.9, 'Decay term for RMSProp.')
 flags.DEFINE_float('rmsprop_momentum', 0.9, 'Momentum in RMSProp.')
 flags.DEFINE_float('rmsprop_epsilon', 1.0, 'Epsilon term for RMSProp.')
-flags.DEFINE_float('adam_beta1', 0.9, 'Beta2 term for the Adam optimizer')
+flags.DEFINE_float('adam_beta1', 0.9, 'Beta1 term for the Adam optimizer')
 flags.DEFINE_float('adam_beta2', 0.999, 'Beta2 term for the Adam optimizer')
 flags.DEFINE_float('adam_epsilon', 1e-8, 'Epsilon term for the Adam optimizer')
 flags.DEFINE_float('gradient_clip', None,
@@ -358,9 +353,6 @@ flags.DEFINE_float('gpu_memory_frac_for_testing', 0,
                    'also useful for using unified memory, as this can be set '
                    'above 1 to oversubscribe the GPU using unified memory.',
                    lower_bound=0.)
-flags.DEFINE_boolean('use_unified_memory', None,
-                     'If True, allocate unified memory enabling larger models '
-                     'to fit in available device RAM.')
 flags.DEFINE_boolean('use_tf_layers', True,
                      'If True, use tf.layers for neural network layers. This '
                      'should not affect performance or accuracy in any way.')
@@ -368,24 +360,8 @@ flags.DEFINE_integer('tf_random_seed', 1234,
                      'The TensorFlow random seed. Useful for debugging NaNs, '
                      'as this can be set to various values to see if the NaNs '
                      'depend on the seed.')
-flags.DEFINE_string('debugger', None,
-                    'If set, use the TensorFlow debugger. If set to "cli", use '
-                    'the local CLI debugger. Otherwise, this must be in the '
-                    'form hostname:port (e.g., localhost:7007) in which case '
-                    'the experimental TensorBoard debugger will be used')
 flags.DEFINE_boolean('use_python32_barrier', False,
                      'When on, use threading.Barrier at Python 3.2.')
-
-flags.DEFINE_boolean('ml_perf', False,
-                     'When True, change how the Imagenet input pipeline works '
-                     'slightly to meet the MLPerf compliance rules. This slows '
-                     'down the input pipeline. Without this option, at the end '
-                     'of the input pipeline, the image is divided by 127.5, '
-                     'then 1.0 is subtracted from it, bringing the image '
-                     'values from [0, 255] to [-1.0, 1.0]. With this option, '
-                     'each of the three channels (red, green, blue) have the '
-                     'average channel value among all image subtracted from '
-                     'it, and no division is done.')
 
 flags.DEFINE_boolean('datasets_use_prefetch', True,
                      'Enable use of prefetched datasets for input pipeline. '
@@ -434,19 +410,10 @@ flags.DEFINE_boolean('force_gpu_compatible', False,
                      'whether to enable force_gpu_compatible in GPU_Options')
 flags.DEFINE_boolean('allow_growth', None,
                      'whether to enable allow_growth in GPU_Options')
-flags.DEFINE_boolean('xla', False, 'whether to enable XLA auto-jit compilation')
-flags.DEFINE_boolean('xla_compile', False,
-                     'Enable xla to compile the graph. Uncompilable ops will '
-                     'result in fatal errors.')
 flags.DEFINE_boolean('fuse_decode_and_crop', True,
                      'Fuse decode_and_crop for image preprocessing.')
 flags.DEFINE_boolean('distort_color_in_yiq', True,
                      'Distort color of input images in YIQ space.')
-flags.DEFINE_boolean('enable_optimizations', True,
-                     'Whether to enable grappler and other optimizations.')
-flags.DEFINE_string('rewriter_config', None,
-                    'Config for graph optimizers, described as a '
-                    'RewriterConfig proto buffer.')
 flags.DEFINE_enum('loss_type_to_report', 'total_loss',
                   ('base_loss', 'total_loss'),
                   'Which type of loss to output and to write summaries for. '
@@ -472,18 +439,6 @@ flags.DEFINE_boolean('sparse_to_dense_grads', False,
                      'before passing them to the optimizer to update '
                      'variables. Only affects models with sparse gradients, '
                      'which currently is only the NCF model.')
-# Performance tuning specific to MKL.
-flags.DEFINE_boolean('mkl', False, 'If true, set MKL environment variables.')
-flags.DEFINE_integer('kmp_blocktime', 0,
-                     'The time, in milliseconds, that a thread should wait, '
-                     'after completing the execution of a parallel region, '
-                     'before sleeping')
-flags.DEFINE_string('kmp_affinity', 'granularity=fine,verbose,compact,1,0',
-                    'Restricts execution of certain threads (virtual execution '
-                    'units) to a subset of the physical processing units in a '
-                    'multiprocessor computer.')
-flags.DEFINE_integer('kmp_settings', 1,
-                     'If set to 1, MKL settings will be printed.')
 
 # fp16 parameters. If use_fp16=False, no other fp16 parameters apply.
 flags.DEFINE_boolean('use_fp16', False,
@@ -654,8 +609,6 @@ flags.DEFINE_string('benchmark_test_id', None,
                     'consumption, and does not have any impact within the '
                     'system.')
 
-platforms_util.define_platform_params()
-
 
 class GlobalStepWatcher(threading.Thread):
   """A helper class for global_step.
@@ -736,39 +689,6 @@ def create_config_proto(params):
   if params.gpu_memory_frac_for_testing > 0:
     config.gpu_options.per_process_gpu_memory_fraction = (
         params.gpu_memory_frac_for_testing)
-  if params.use_unified_memory:
-    config.gpu_options.experimental.use_unified_memory = (
-        params.use_unified_memory)
-  if params.xla:
-    config.graph_options.optimizer_options.global_jit_level = (
-        tf.OptimizerOptions.ON_1)
-    # TODO(b/117324590): Re-enable PinToHostOptimizer when b/117324590 is fixed.
-    # Currently we have to disable PinToHostOptimizer w/ XLA since it causes
-    # OOM/perf cliffs.
-    config.graph_options.rewrite_options.pin_to_host_optimization = (
-        rewriter_config_pb2.RewriterConfig.OFF)
-  if params.rewriter_config:
-    rewriter_config = rewriter_config_pb2.RewriterConfig()
-    text_format.Merge(params.rewriter_config, rewriter_config)
-    config.graph_options.rewrite_options.CopyFrom(rewriter_config)
-  elif not params.enable_optimizations:
-    off = rewriter_config_pb2.RewriterConfig.OFF
-    config.graph_options.optimizer_options.opt_level = tf.OptimizerOptions.L0
-    rewrite_options = config.graph_options.rewrite_options
-    rewrite_options.layout_optimizer = off
-    rewrite_options.constant_folding = off
-    rewrite_options.shape_optimization = off
-    rewrite_options.remapping = off
-    rewrite_options.arithmetic_optimization = off
-    rewrite_options.dependency_optimization = off
-    rewrite_options.loop_optimization = off
-    rewrite_options.function_optimization = off
-    rewrite_options.debug_stripper = off
-    rewrite_options.disable_model_pruning = True
-    rewrite_options.scoped_allocator_optimization = off
-    rewrite_options.memory_optimization = (
-        rewriter_config_pb2.RewriterConfig.NO_MEM_OPT)
-    rewrite_options.pin_to_host_optimization = off
   elif params.variable_update == 'collective_all_reduce':
     rewrite_options = config.graph_options.rewrite_options
     rewrite_options.scoped_allocator_optimization = (
@@ -795,12 +715,7 @@ def get_mode_from_params(params):
   Raises:
     ValueError: Unsupported params settings.
   """
-  if params.forward_only and params.eval:
-    raise ValueError('Only one of forward_only and eval parameters is true')
-
-  if params.eval:
-    return constants.BenchmarkMode.EVAL
-  elif params.forward_only:
+  if params.forward_only:
     return constants.BenchmarkMode.FORWARD_ONLY
   elif (params.eval_during_training_every_n_steps or
         params.eval_during_training_every_n_epochs or
@@ -876,14 +791,6 @@ def benchmark_one_step(sess,
           LOSS_AND_ACCURACY_DIGITS_TO_SHOW, results['top_1_accuracy'],
           LOSS_AND_ACCURACY_DIGITS_TO_SHOW, results['top_5_accuracy'])
     log_fn(log_str)
-    if benchmark_logger:
-      benchmark_logger.log_metric(
-          'current_examples_per_sec', speed_mean, global_step=step + 1)
-      if 'top_1_accuracy' in results:
-        benchmark_logger.log_metric(
-            'top_1_accuracy', results['top_1_accuracy'], global_step=step + 1)
-        benchmark_logger.log_metric(
-            'top_5_accuracy', results['top_5_accuracy'], global_step=step + 1)
   if need_options_and_metadata:
     if should_profile:
       profiler.add_step(step, run_metadata)
@@ -1271,18 +1178,14 @@ class BenchmarkCNN(object):
       ValueError: Unsupported params settings.
     """
     self.params = params
-    if params.eval:
-      self._doing_eval = True
-    else:
-      # Note self._doing_eval can later switch to True in self._do_eval() if
-      # self.params.eval_during_training_* is specified.
-      self._doing_eval = False
+    # Note self._doing_eval can later switch to True in self._do_eval() if
+    # self.params.eval_during_training_* is specified.
+    self._doing_eval = False
     self.dataset = dataset or datasets.create_dataset(self.params.data_dir,
                                                       self.params.data_name)
     self.model = model or model_config.get_model_config(
         self.params.model, self.dataset, self.params)
     self.trace_filename = self.params.trace_file
-    self.rewriter_config = self.params.rewriter_config
     autotune_threshold = self.params.autotune_threshold if (
         self.params.autotune_threshold) else 1
     min_autotune_warmup = 5 * autotune_threshold * autotune_threshold
@@ -1298,8 +1201,7 @@ class BenchmarkCNN(object):
     else:
       self.gpu_indices = [x for x in range(self.num_gpus)]
 
-    if (self.params.device == 'cpu' and self.params.data_format == 'NCHW' and
-        not self.params.mkl):
+    if (self.params.device == 'cpu' and self.params.data_format == 'NCHW'):
       raise ValueError('device=cpu requires that data_format=NHWC')
 
     if ((self.params.num_epochs_per_decay or
@@ -1343,11 +1245,6 @@ class BenchmarkCNN(object):
         raise ValueError('Automatic loss scaling is not supported with'
                          'staged_vars.')
 
-    if (self.params.debugger is not None and self.params.debugger != 'cli' and
-        ':' not in self.params.debugger):
-      raise ValueError('--debugger must be "cli" or in the form '
-                       'host:port')
-
     if self.params.hierarchical_copy and self.params.num_gpus <= 1:
       raise ValueError('--hierarchical_copy requires --num_gpus to be greater '
                        'than 1')
@@ -1370,9 +1267,6 @@ class BenchmarkCNN(object):
     eval_during_training_enabled = any(eval_during_training_flags)
 
     if eval_during_training_enabled:
-      if params.eval:
-        raise ValueError('At most one of --eval and --eval_during_training_* '
-                         'must be specified')
       if params.forward_only:
         raise ValueError('At most one of --forward_only and '
                          '--eval_during_training_* must be specified')
@@ -1505,7 +1399,7 @@ class BenchmarkCNN(object):
         for i in xrange(self.num_gpus)
     ]
 
-    subset = 'validation' if params.eval else 'train'
+    subset = 'train'
     self.num_batches, self.num_epochs = get_num_batches_and_epochs(
         params, self.batch_size * self.num_workers,
         self.dataset.num_examples_per_epoch(subset))
@@ -1639,8 +1533,7 @@ class BenchmarkCNN(object):
     self.input_preprocessor = None
     self.eval_input_preprocessor = None
     if not self.dataset.use_synthetic_gpu_inputs():
-      if not self.params.eval:
-        self.input_preprocessor = self.get_input_preprocessor()
+      self.input_preprocessor = self.get_input_preprocessor()
       if self.mode in (constants.BenchmarkMode.EVAL,
                        constants.BenchmarkMode.TRAIN_AND_EVAL):
         with self._do_eval():
@@ -1653,18 +1546,6 @@ class BenchmarkCNN(object):
         self.input_preprocessor and
         self.input_preprocessor.supports_datasets())
     self.init_global_step = 0
-
-    self._config_benchmark_logger()
-
-    if self.mode == constants.BenchmarkMode.TRAIN_AND_EVAL:
-      # Remove "eval" from params so it is not accidentally used. Since eval can
-      # still occur despite params.eval being False, params.eval should never
-      # be used. We cannot yet remove this unconditionally, because the SSD
-      # model still uses params.eval, and hence does not work properly with
-      # --eval_during_training_*.
-      # TODO(b/116627045): We should also remove fields that have an eval
-      # equivalent, like num_batches and num_eval_batches.
-      self.params = remove_param_fields(self.params, {'eval'})
 
   @contextlib.contextmanager
   def _do_eval(self):
@@ -1697,22 +1578,6 @@ class BenchmarkCNN(object):
       self.num_epochs = old_num_epochs
       self.batch_size = old_batch_size
       self.model.set_batch_size(old_batch_size // self.num_gpus)
-
-  def _config_benchmark_logger(self):
-    """Config the model garden benchmark logger."""
-    model_benchmark_logger = None
-    if self.params.benchmark_log_dir is not None:
-      try:
-        from official.utils.logs import logger as models_logger  # pylint: disable=g-import-not-at-top
-      except ImportError:
-        tf.logging.fatal('Please include tensorflow/models to the PYTHONPATH '
-                         'in order to use BenchmarkLogger. Configured '
-                         'benchmark_log_dir: %s'
-                         % self.params.benchmark_log_dir)
-        raise
-      model_benchmark_logger = models_logger.BenchmarkFileLogger(
-          self.params.benchmark_log_dir)
-    self.benchmark_logger = model_benchmark_logger
 
   # TODO(laigd): this changes the global device list which is used everywhere,
   # consider refactoring it.
@@ -1757,8 +1622,6 @@ class BenchmarkCNN(object):
     log_fn('Devices:     %s' % benchmark_info['device_list'])
     log_fn('NUMA bind:   %s' % self.params.use_numa_affinity)
     log_fn('Data format: %s' % self.params.data_format)
-    if self.rewriter_config:
-      log_fn('RewriterConfig: %s' % self.rewriter_config)
     log_fn('Optimizer:   %s' % self.params.optimizer)
     log_fn('Variables:   %s' % self.params.variable_update)
     if (self.params.variable_update == 'replicated' or
@@ -1795,38 +1658,6 @@ class BenchmarkCNN(object):
         'single_session': single_session,
         'device_list': device_list,}
 
-  def _log_benchmark_run(self):
-    """Log the benchmark info to the logger.
-
-    The info logged here should be similar to print_info(), but in a structured
-    JSON format.
-    """
-    if self.benchmark_logger:
-      benchmark_info = self._get_params_info()
-
-      run_param = {
-          'model': self.model.get_model_name(),
-          'dataset': benchmark_info['dataset_name'],
-          'mode': self.mode,
-          'single_sess': benchmark_info['single_session'],
-          'devices': benchmark_info['device_list'],
-          'batch_size': self.batch_size,
-          'batch_size_per_device': self.batch_size // len(self.raw_devices),
-          'num_batches': self.num_batches,
-          'num_epochs': self.num_epochs,
-          'data_format': self.params.data_format,
-          'rewrite_config': self.rewriter_config,
-          'optimizer': self.params.optimizer,
-          'session_config': create_config_proto(self.params),
-      }
-      # TODO(scottzhu): tf_cnn_benchmark might execute several times with
-      # different param setting on the same box. This will cause the run file to
-      # only contain the latest info. The benchmark_log_dir should be updated
-      # for every new run.
-      self.benchmark_logger.log_run_info(
-          self.model.get_model_name(), benchmark_info['dataset_name'],
-          run_param, test_id=self.params.benchmark_test_id)
-
   def run(self):
     """Run the benchmark task assigned to this process.
 
@@ -1850,7 +1681,6 @@ class BenchmarkCNN(object):
       elif self.params.job_name and self.params.job_name != 'controller':
         raise ValueError('unrecognized job name: %s' % self.params.job_name)
 
-    self._log_benchmark_run()
     if self._doing_eval:
       with tf.Graph().as_default():
         # TODO(laigd): freeze the graph in eval mode.
@@ -2022,14 +1852,6 @@ class BenchmarkCNN(object):
         log_fn('-' * 64)
         log_fn('total images/sec: %.2f' % images_per_sec)
         log_fn('-' * 64)
-      if self.benchmark_logger:
-        eval_result = {
-            'eval_top_1_accuracy', accuracy_at_1,
-            'eval_top_5_accuracy', accuracy_at_5,
-            'eval_average_examples_per_sec', images_per_sec,
-            tf.GraphKeys.GLOBAL_STEP, global_step,
-        }
-        self.benchmark_logger.log_evaluation_result(eval_result)
       #mlperf.logger.log_eval_epoch(
       #    mlperf.tags.EVAL_STOP, global_step, self.batch_size)
       #mlperf.logger.log(key=mlperf.tags.EVAL_SIZE,
@@ -2359,14 +2181,7 @@ class BenchmarkCNN(object):
       done_fn = lambda: local_step >= end_local_step
     else:
       done_fn = global_step_watcher.done
-    if self.params.debugger is not None:
-      if self.params.debugger == 'cli':
-        log_fn('The CLI TensorFlow debugger will be used.')
-        sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-      else:
-        log_fn('The TensorBoard debugger plugin will be used.')
-        sess = tf_debug.TensorBoardDebugWrapperSession(sess,
-                                                       self.params.debugger)
+
     #mlperf.logger.log(key=mlperf.tags.TRAIN_LOOP)
     skip_final_eval = False
     accuracy_at_1 = None
@@ -2404,7 +2219,7 @@ class BenchmarkCNN(object):
                              if self.single_session else 1), step_train_times,
           self.trace_filename, self.params.partitioned_graph_file_prefix,
           profiler, image_producer, self.params, fetch_summary,
-          benchmark_logger=self.benchmark_logger,
+          None,
           collective_graph_key=collective_graph_key)
       if summary_str is not None and is_chief:
         supervisor.summary_computed(sess, summary_str)
@@ -2494,9 +2309,8 @@ class BenchmarkCNN(object):
     if eval_image_producer is not None:
       eval_image_producer.done()
     if is_chief:
-      if self.benchmark_logger:
-        self.benchmark_logger.log_metric(
-            'average_examples_per_sec', images_per_sec, global_step=num_steps)
+      log_fn('average_examples_per_sec: '
+        '{} at global step {}'.format(images_per_sec, num_steps))
 
     # Save the model checkpoint.
     if self.params.train_dir is not None and is_chief:
@@ -3115,18 +2929,10 @@ class BenchmarkCNN(object):
           input_list = self.model.get_synthetic_inputs(
               BenchmarkCNN.GPU_CACHED_INPUT_VARIABLE_NAME, nclass)
 
-    # Labels reshaping happens all on gpu:0. Reshaping synthetic labels on
-    # multiple devices slows down XLA computation for an unknown reason.
-    # TODO(b/116875203): Find/address root cause of XLA slow down.
-    labels_device_placement_hack = (
-        self.dataset.use_synthetic_gpu_inputs() and self.params.xla_compile)
-
     def device_aware_reshape(tensor, shape):
       device = self.devices[rel_device_num]
       # Labels are int32, place reshapes on gpu:0 (no device placement) when the
       # hack is enabled.
-      if labels_device_placement_hack and tensor.dtype == tf.int32:
-        device = ''
       with tf.device(device):
         return tf.reshape(tensor, shape=shape)
 
@@ -3373,19 +3179,6 @@ class BenchmarkCNN(object):
 
       return tf.group(*queue_ops)
 
-
-def _is_mkl_flag_absent(mkl_flag):
-  return not (absl_flags.FLAGS.is_parsed() and mkl_flag in absl_flags.FLAGS
-              and absl_flags.FLAGS[mkl_flag].present)
-
-
-def _print_os_env_ignored_warning(mkl_flag, flag_default_val, os_env_var):
-  tf.logging.warn(
-      ('OS ENV variable %s=%s is ignored and script default: '
-       '%s is used. Use --%s to override.') %
-      (os_env_var, os.environ[os_env_var], flag_default_val, mkl_flag))
-
-
 def _set_environ_vars(params):
   """Sets up the environment variables that BenchmarkCNN should use."""
   if params.batchnorm_persistent:
@@ -3401,22 +3194,6 @@ def _set_environ_vars(params):
   os.environ['TF_SYNC_ON_FINISH'] = str(int(params.sync_on_finish))
   argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-  # Sets environment variables for MKL
-  # If OS ENV vars are overridden by script defaults, a warning msg is printed.
-  if params.mkl:
-    mkl_flags = ['kmp_blocktime', 'kmp_settings', 'kmp_affinity',
-                 'num_intra_threads']
-    for mkl_flag in mkl_flags:
-      os_env_var = mkl_flag.upper()
-      if mkl_flag == 'num_intra_threads':
-        os_env_var = 'OMP_NUM_THREADS'
-      flag_val = str(getattr(params, mkl_flag))
-      if _is_mkl_flag_absent(mkl_flag) and os_env_var in os.environ:
-        _print_os_env_ignored_warning(mkl_flag, flag_val, os_env_var)
-      os.environ[os_env_var] = flag_val
-      if mkl_flag == 'num_intra_threads' and not params.num_intra_threads:
-        os.environ.pop(os_env_var, None)
 
   # Sets GPU thread settings
   if params.device.lower() == 'gpu':
@@ -3480,7 +3257,7 @@ def setup(params):
     import horovod.tensorflow as hvd  # pylint: disable=g-import-not-at-top
     hvd.init()
 
-  platforms_util.initialize(params, create_config_proto(params))
+  #platforms_util.initialize(params, create_config_proto(params))
 
   if not params.job_name:
     # Create a dummy session to initialize TF global variables using the input
@@ -3498,7 +3275,4 @@ def setup(params):
 
 
 def maybe_compile(computation, params):
-  if params and params.xla_compile:
-    return xla.compile(computation)
-  else:
-    return computation()
+  return computation()
