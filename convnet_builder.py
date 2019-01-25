@@ -112,8 +112,6 @@ class ConvNetBuilder(object):
     """Construct a conv2d layer on top of cnn."""
     if input_layer is None:
       input_layer = self.top_layer
-    if num_channels_in is None:
-      num_channels_in = self.top_size
     if stddev is not None and kernel_initializer is None:
       kernel_initializer = tf.truncated_normal_initializer(stddev=stddev)
     if kernel_initializer is None:
@@ -138,13 +136,10 @@ class ConvNetBuilder(object):
                                     data_format = self.channel_pos,
                                     kernel_initializer=kernel_initializer)
         else:
-          rate = 1  # Unused (for 'a trous' convolutions)
-          kernel_height_effective = k_height + (k_height - 1) * (rate - 1)
-          pad_h_beg = (kernel_height_effective - 1) // 2
-          pad_h_end = kernel_height_effective - 1 - pad_h_beg
-          kernel_width_effective = k_width + (k_width - 1) * (rate - 1)
-          pad_w_beg = (kernel_width_effective - 1) // 2
-          pad_w_end = kernel_width_effective - 1 - pad_w_beg
+          pad_h_beg = (k_height - 1) // 2
+          pad_h_end = k_height - 1 - pad_h_beg
+          pad_w_beg = (k_width - 1) // 2
+          pad_w_end = k_width - 1 - pad_w_beg
           padding = [[0, 0], [pad_h_beg, pad_h_end],
                      [pad_w_beg, pad_w_end], [0, 0]]
           if self.data_format == 'NCHW':
@@ -332,53 +327,7 @@ class ConvNetBuilder(object):
       dropout = core_layers.dropout(input_layer, 1. - keep_prob,
                                     training=self.phase_train)
       self.top_layer = dropout
-      #if self.data_format == 'NHWC':
-      #  self.top_size = dropout.shape[3]
-      #else:
-      #  self.top_size = dropout.shape[1]
       return dropout
-
-  def _batch_norm_without_layers(self, input_layer, decay, use_scale, epsilon):
-    """Batch normalization on `input_layer` without tf.layers."""
-    # We make this function as similar as possible to the
-    # tf.contrib.layers.batch_norm, to minimize the differences between using
-    # layers and not using layers.
-    shape = input_layer.shape
-    num_channels = shape[3] if self.data_format == 'NHWC' else shape[1]
-    beta = self.get_variable('beta', [num_channels], tf.float32, tf.float32,
-                             initializer=tf.zeros_initializer())
-    if use_scale:
-      gamma = self.get_variable('gamma', [num_channels], tf.float32,
-                                tf.float32, initializer=tf.ones_initializer())
-    else:
-      gamma = tf.constant(1.0, tf.float32, [num_channels])
-    # For moving variables, we use tf.get_variable instead of self.get_variable,
-    # since self.get_variable returns the result of tf.cast which we cannot
-    # assign to.
-    moving_mean = tf.get_variable('moving_mean', [num_channels],
-                                  tf.float32,
-                                  initializer=tf.zeros_initializer(),
-                                  trainable=False)
-    moving_variance = tf.get_variable('moving_variance', [num_channels],
-                                      tf.float32,
-                                      initializer=tf.ones_initializer(),
-                                      trainable=False)
-    if self.phase_train:
-      bn, batch_mean, batch_variance = tf.nn.fused_batch_norm(
-          input_layer, gamma, beta, epsilon=epsilon,
-          data_format=self.data_format, is_training=True)
-      mean_update = moving_averages.assign_moving_average(
-          moving_mean, batch_mean, decay=decay, zero_debias=False)
-      variance_update = moving_averages.assign_moving_average(
-          moving_variance, batch_variance, decay=decay, zero_debias=False)
-      tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, mean_update)
-      tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, variance_update)
-    else:
-      bn, _, _ = tf.nn.fused_batch_norm(
-          input_layer, gamma, beta, mean=moving_mean,
-          variance=moving_variance, epsilon=epsilon,
-          data_format=self.data_format, is_training=False)
-    return bn
 
   def batch_norm(self, input_layer=None, decay=0.999, scale=False,
                  epsilon=0.001):
@@ -405,9 +354,6 @@ class ConvNetBuilder(object):
     self.top_layer = bn
     self.top_size = bn.shape[3] if self.data_format == 'NHWC' else bn.shape[1]
     self.top_size = int(self.top_size)
-    #mlperf.logger.log_batch_norm(
-    #    input_tensor=input_layer, output_tensor=bn, momentum=decay,
-    #    epsilon=epsilon, center=center, scale=scale, training=self.phase_train)
     return bn
 
   def lrn(self, depth_radius=0.5, bias=1, alpha=1, beta=0.5):

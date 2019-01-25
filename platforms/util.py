@@ -27,4 +27,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from platforms.default.util import *  # pylint: disable=unused-import,wildcard-import
+import cnn_util
+
+def get_cluster_manager(params, config_proto):
+  """Returns the cluster manager to be used."""
+  return cnn_util.GrpcClusterManager(params, config_proto)

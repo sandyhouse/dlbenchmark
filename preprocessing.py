@@ -253,8 +253,6 @@ def eval_image(image,
                             tf.int32)
     resize_width = tf.cast(image_width_float * max_ratio * scale_factor,
                            tf.int32)
-    #mlperf.logger.log_input_resize_aspect_preserving(height, width,
-    #                                                 scale_factor)
 
     # Resize the image to shape (`resize_height`, `resize_width`)
     image_resize_method = get_image_resize_method(resize_method, batch_position)
@@ -264,9 +262,6 @@ def eval_image(image,
                                              align_corners=False)
 
     # Do a central crop of the image to size (height, width).
-    # MLPerf requires us to log (height, width) with two different keys.
-    #mlperf.logger.log(key=mlperf.tags.INPUT_CENTRAL_CROP, value=[height, width])
-    #mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
     total_crop_height = (resize_height - height)
     crop_top = total_crop_height // 2
     total_crop_width = (resize_width - width)
@@ -333,14 +328,6 @@ def train_image(image_buffer,
     aspect_ratio_range = [0.75, 1.33]
     area_range = [0.05, 1.0]
     max_attempts = 100
-    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MIN_OBJ_COV,
-    #                  value=min_object_covered)
-    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_RATIO_RANGE,
-    #                  value=aspect_ratio_range)
-    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_AREA_RANGE,
-    #                  value=area_range)
-    #mlperf.logger.log(key=mlperf.tags.INPUT_DISTORTED_CROP_MAX_ATTEMPTS,
-    #                  value=max_attempts)
 
     sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
         tf.image.extract_jpeg_shape(image_buffer),
@@ -373,12 +360,10 @@ def train_image(image_buffer,
                                    dct_method='INTEGER_FAST')
       image = tf.slice(image, bbox_begin, bbox_size)
 
-    #mlperf.logger.log(key=mlperf.tags.INPUT_RANDOM_FLIP)
     distorted_image = tf.image.random_flip_left_right(image)
 
     # This resizing operation may distort the images because the aspect
     # ratio is not respected.
-    #mlperf.logger.log(key=mlperf.tags.INPUT_RESIZE, value=[height, width])
     image_resize_method = get_image_resize_method(resize_method, batch_position)
     distorted_image = tf.image.resize_images(
         distorted_image, [height, width],
@@ -627,9 +612,7 @@ class BaseImagePreprocessor(InputPreprocessor):
     image_buffer, label_index, bbox, _ = parse_example_proto(value)
     if self.match_mlperf:
       bbox = tf.zeros((1, 0, 4), dtype=bbox.dtype)
-      #mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=False)
     else:
-      #mlperf.logger.log(key=mlperf.tags.INPUT_CROP_USES_BBOXES, value=True)
       pass
     image = self.preprocess(image_buffer, bbox, batch_position)
     return (image, label_index)
@@ -793,7 +776,7 @@ class ImagenetPreprocessor(RecordInputImagePreprocessor):
   def preprocess(self, image_buffer, bbox, batch_position):
     # pylint: disable=g-import-not-at-top
     try:
-      from official.resnet.imagenet_preprocessing import preprocess_image
+      from imagenet_preprocessing import preprocess_image
     except ImportError:
       tf.logging.fatal('Please include tensorflow/models to the PYTHONPATH.')
       raise
