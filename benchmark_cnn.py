@@ -1037,7 +1037,7 @@ class BenchmarkCNN(object):
     with graph.as_default():
       build_result = self._build_graph()
     with graph.as_default():
-      return self._benchmark_graph(build_result, None)
+      return self._benchmark_graph(build_result)
 
   GPU_CACHED_INPUT_VARIABLE_NAME = 'gpu_cached_inputs'
 
@@ -1105,15 +1105,13 @@ class BenchmarkCNN(object):
         local_var_init_op_group=local_var_init_op_group,
         summary_op=summary_op)
 
-  def _benchmark_graph(self, graph_info, eval_graph_info=None):
+  def _benchmark_graph(self, graph_info):
     """Benchmark the training graph.
 
     Args:
       graph_info: the namedtuple returned by _build_graph() which
         contains all necessary information to benchmark the graph, including
         named tensors/ops list, fetches, etc.
-      eval_graph_info: Similar to graph_info but for the eval graph if
-        --eval_during_training_* is used. Otherwise, None.
     Returns:
       Dictionary containing training statistics (num_workers, num_steps,
       average_wall_time, images_per_sec).
@@ -1217,7 +1215,7 @@ class BenchmarkCNN(object):
       # caller.
       try:
         stats = self.benchmark_with_session(
-            sess, sv, graph_info, eval_graph_info, bcast_global_variables_op,
+            sess, sv, graph_info, bcast_global_variables_op,
             is_chief, summary_writer, profiler)
       except tf.errors.OutOfRangeError:
         raise RuntimeError(
@@ -1231,7 +1229,7 @@ class BenchmarkCNN(object):
     return stats
 
   def benchmark_with_session(self, sess, supervisor, graph_info,
-                             eval_graph_info, bcast_global_variables_op,
+                             bcast_global_variables_op,
                              is_chief, summary_writer, profiler):
     """Benchmarks the graph with the given session.
 
@@ -1241,8 +1239,6 @@ class BenchmarkCNN(object):
       graph_info: the namedtuple returned by _build_graph() which
         contains all necessary information to benchmark the graph, including
         named tensors/ops list, fetches, etc.
-      eval_graph_info: Similar to graph_info but for the eval graph if
-        --eval_during_training_every_n_steps is used. Otherwise, None.
       bcast_global_variables_op: If Horovod is used, the op to broadcast the
         global variables to all the processes. None if Horovod is not used.
       is_chief: True if this is the chief process.
