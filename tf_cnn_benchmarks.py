@@ -24,10 +24,12 @@ from absl import flags as absl_flags
 import tensorflow as tf
 
 import benchmark_cnn
+import benchmark_nlp
 import cnn_util
 import flags
 from cnn_util import log_fn
 
+NLP_MODELS = ['bert']
 
 flags.define_flags()
 for name in flags.param_specs.keys():
@@ -44,15 +46,19 @@ def main(positional_arguments):
                      % positional_arguments[1:])
 
   params = benchmark_cnn.make_params_from_flags()
-  params = benchmark_cnn.setup(params)
-  bench = benchmark_cnn.BenchmarkCNN(params)
-
-  tfversion = cnn_util.tensorflow_version_tuple()
-  log_fn('TensorFlow:  %i.%i' % (tfversion[0], tfversion[1]))
-
-  bench.print_info()
-  bench.run()
-
+  if params.model in NLP_MODELS:
+    tfversion = cnn_util.tensorflow_version_tuple()
+    log_fn('TensorFlow:  %i.%i' % (tfversion[0], tfversion[1]))
+    log_fn("Running NLP model.")
+    bench = benchmark_nlp.BenchmarkNLP(params)
+    bench.run()
+  else:
+    params = benchmark_cnn.setup(params)
+    bench = benchmark_cnn.BenchmarkCNN(params)
+    tfversion = cnn_util.tensorflow_version_tuple()
+    log_fn('TensorFlow:  %i.%i' % (tfversion[0], tfversion[1]))
+    bench.print_info()
+    bench.run()
 
 if __name__ == '__main__':
   app.run(main)  # Raises error on invalid flags, unlike tf.app.run()

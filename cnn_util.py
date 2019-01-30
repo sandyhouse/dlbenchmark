@@ -251,3 +251,7 @@ class GrpcClusterManager(BaseClusterManager):
 
   def join_server(self):
     return self._server.join()
+
+def get_cluster_manager(params, config_proto):
+  """Returns the cluster manager to be used."""
+  return GrpcClusterManager(params, config_proto)

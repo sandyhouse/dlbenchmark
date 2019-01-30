@@ -390,6 +390,48 @@ flags.DEFINE_integer('max_ckpts_to_keep', 5,
 flags.DEFINE_string('train_dir', None,
                     'Path to session checkpoints. Pass None to disable saving '
                     'checkpoint at the end.')
+# Paramters for bert model.
+flags.DEFINE_string('bert_data_dir', None,
+                    'The input data dir for the task')
+flags.DEFINE_string('bert_config_file', None,
+                    'The config file (json) for the BERT model, which '
+                    'specifies the model architecture.')
+flags.DEFINE_string('task_name', None,
+                    'The name of the task to train.')
+flags.DEFINE_string('vocab_file', None,
+                    'The vocabulary file the BERT model train on.')
+flags.DEFINE_string('output_dir', None,
+                    'The output dir. that the model checkpoints will be '
+                    'written to.')
+flags.DEFINE_string('init_checkpoint', None,
+                    'Initial checkpoint from a pre-trained BERT model.')
+flags.DEFINE_boolean('do_lower_case', True,
+                     'Whether to use low case for input text. Should be True '
+                     'for uncased models and False for cased modes.')
+flags.DEFINE_integer('max_seq_length', 128,
+                     'Maximum length of input sequence after WordPiece '
+                     'tokenization. Sequences longer than that will be '
+                     'truncated, and sequences shorter than that will be '
+                     'padded.')
+flags.DEFINE_boolean('do_train', True,
+                     'Run training or not.')
+flags.DEFINE_boolean('do_eval', False,
+                     'Run evaluate or not.')
+flags.DEFINE_boolean('do_predict', False,
+                     'Do predication or not.')
+flags.DEFINE_integer('eval_batch_size', 8,
+                     'Batch size for evaluation.')
+flags.DEFINE_integer('predict_batch_size', 8,
+                     'Batch size for predication.')
+flags.DEFINE_float('warmup_propotion', 0.1,
+                   'Proportion of training to perform linear rate warmup for. '
+                   'E.g., 0.1=10% of training.')
+flags.DEFINE_integer('save_checkpoints_steps', 1000,
+                     'How often to save the checkpoint.')
+flags.DEFINE_integer('iteration_per_loop', 1000,
+                     'How many steps to make in each estimator call.')
+flags.DEFINE_string('master', None,
+                    '[Optional] Master URL.')
 
 class GlobalStepWatcher(threading.Thread):
   """A helper class for global_step.
@@ -800,7 +842,7 @@ class BenchmarkCNN(object):
     self.local_parameter_device_flag = self.params.local_parameter_device
     if self.job_name:
       self.task_index = self.params.task_index
-      self.cluster_manager = platforms_util.get_cluster_manager(
+      self.cluster_manager = cnn_util.get_cluster_manager(
           params, create_config_proto(params))
       assert isinstance(self.cluster_manager, cnn_util.BaseClusterManager)
 
