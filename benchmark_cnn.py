@@ -47,7 +47,6 @@ import variable_mgr
 import variable_mgr_util
 from cnn_util import log_fn
 from models import model_config
-from platforms import util as platforms_util
 from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.python.client import timeline
 from tensorflow.python.framework import graph_util
@@ -110,7 +109,7 @@ flags.DEFINE_string('model', 'trivial',
 flags.DEFINE_boolean('print_training_accuracy', False,
                      'whether to calculate and print training accuracy during '
                      'training')
-flags.DEFINE_integer('batch_size', 0, 'batch size per compute device')
+flags.DEFINE_integer('batch_size', 32, 'batch size per compute device')
 flags.DEFINE_integer('batch_group_size', 1,
                      'number of groups of batches processed in the image '
                      'producer.')
@@ -423,15 +422,70 @@ flags.DEFINE_integer('eval_batch_size', 8,
                      'Batch size for evaluation.')
 flags.DEFINE_integer('predict_batch_size', 8,
                      'Batch size for predication.')
-flags.DEFINE_float('warmup_propotion', 0.1,
+flags.DEFINE_float('warmup_proportion', 0.1,
                    'Proportion of training to perform linear rate warmup for. '
                    'E.g., 0.1=10% of training.')
+flags.DEFINE_float('num_train_epochs', 3.0,
+                   'Total number of training epochs to perform.')
 flags.DEFINE_integer('save_checkpoints_steps', 1000,
                      'How often to save the checkpoint.')
-flags.DEFINE_integer('iteration_per_loop', 1000,
+flags.DEFINE_float('learning_rate', 5e-5,
+                   'The initial learning rate for Adam (for BERT)')
+flags.DEFINE_integer('iterations_per_loop', 1000,
                      'How many steps to make in each estimator call.')
 flags.DEFINE_string('master', None,
                     '[Optional] Master URL.')
+# Parameters for transformer model.
+flags.DEFINE_string('param_set', 'big',
+                    'Parameter set to use when creating and training the '
+                    'model. The parameters define the input shape (batch size '
+                    'and max length), model configuration (size of embedding, '
+                    '# of hidden layers, etc.), and various other settings. '
+                    'The big parameter set increases the default batch size, '
+                    'embedding/hidden size, and filter size. For a complete '
+                    'list of parameters, please see the models/nlp/transformer'
+                    '/model/model_params.py')
+flags.DEFINE_string('model_dir', '/tmp',
+                    'The location of the model checkpoint files.')
+flags.DEFINE_integer('num_parallel_calls', multiprocessing.cpu_count(),
+                     'The number of records that are processed in parallel '
+                     'during input processing. This can be optimized per data '
+                     'set but for generally homogeneous data sets, should be '
+                     'approximately the number of available CPU cores.')
+flags.DEFINE_boolean('use_synthetic_data', False,
+                     'If set, use fake data (zeros) instead of a real dataset. '
+                     'This mode is useful for performance debugging, as it '
+                     'removes input processing steps, but will not learn '
+                     'anything.')
+flags.DEFINE_boolean('static_batch', False,
+                     'Whether the batches in the dataset should have static '
+                     'shape. In general, this setting should be False. Dynamic '
+                     'shapes allow the input to be grouped so that the number ' 
+                     'of padding tokens is minimized, and helps model training.'
+                     ' In cases where the input shape must be static (e.g., '
+                     'running on TPU), this setting will be ignored and static '
+                     'batching will always be used.')
+flags.DEFINE_integer('train_steps', None,
+                     'The number of steps used to train.')
+flags.DEFINE_integer('steps_between_evals', 1000,
+                     'The number of training steps to run between evaluations. '
+                     'This is used if --train_steps is defined')
+flags.DEFINE_string('bleu_source', None,
+                    'Path to source file containing text translate when '
+                    'calculating the official BLEU score. Both --bleu_soure '
+                    'and --bleu_ref must be set. Use the flag --stop_threshold '
+                    'to stop the script based on the uncased BLEU score.')
+flags.DEFINE_string('bleu_ref', None,
+                    'Path to source file containing text translate when '
+                    'calculating the official BLEU score. Both --bleu_soure '
+                    'and --bleu_ref must be set. Use the flag --stop_threshold '
+                    'to stop the script based on the uncased BLEU score.')
+flags.DEFINE_integer('train_epochs', 1,
+                     'The number of epochs used to train.')
+flags.DEFINE_integer('epochs_between_evals', 1,
+                     'The number of training epochs to run between '
+                     'evaluations.')
+
 
 class GlobalStepWatcher(threading.Thread):
   """A helper class for global_step.

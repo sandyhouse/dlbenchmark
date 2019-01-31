@@ -29,7 +29,7 @@ import cnn_util
 import flags
 from cnn_util import log_fn
 
-NLP_MODELS = ['bert']
+NLP_MODELS = ['bert', 'transformer']
 
 flags.define_flags()
 for name in flags.param_specs.keys():
