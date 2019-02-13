@@ -1,5 +1,4 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
+# -*- coding:utf-8 -*-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -34,7 +33,8 @@ ALL_MODELS = ['alexnet',
               'bert',
               'transformer',
              ]
-# The supported Natural Language Processing (NLP) models
+
+# All supported NLP models to benchmark.
 NLP_MODELS = ['bert', 'transformer']
 
 # Define and parse command line arguments.
@@ -58,10 +58,6 @@ def _validate_flags(params):
     print("Please specify one of the above models.")
     exit()
   
-  if params.num_batches is not None and params.num_epochs is not None:
-    print("`--num_batches` and `--num_epochs` cannot be both specified.")
-    exit()
-
   count = 0
   if params.do_train:
     count += 1

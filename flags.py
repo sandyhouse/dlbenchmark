@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(
         usage='%(prog)s [options]',
         description="Benchmarks for Deep Learning Platform - TensorFlow.")
 
-# Define commond line arguments for all benchmarks
+# Define commond line arguments for benchmarks
 def define_flags():
   parser.add_argument("--model",
                       type=str,
@@ -33,36 +33,33 @@ def define_flags():
                       type=int,
                       default=32,
                       help="Batch size per computing device.")
-  parser.add_argument("--num_batches",
-                      type=int,
-                      default=None,
-                      help="Number of batches to run. Note: "
-                      "`--num_batches` and `--num_epochs` cannot be both "
-                      "specified.")
   parser.add_argument("--num_epochs",
                       type=int,
-                      default=None,
-                      help="Number of epochs to run. Note: "
-                      "`--num_batches` and `--num_epochs` cannot be both "
-                      "specified.")
+                      default=1,
+                      help="Number of epochs to run.")
   parser.add_argument("--num_gpus",
                       type=int,
                       default=1,
                       help="Number of GPUs to use. If the value is set to 0, "
                            "CPUs will be used instead.")
-  parser.add_argument("--num_warmup_batches",
-                      type=int,
-                      default=None,
-                      help="Number of batches to run for warmup.")
   parser.add_argument("--data_dir",
                       type=str,
                       default=None,
                       help="Directory for input dataset. If it is not set, "
                            "synthetic data will be used.")
-  parser.add_argument("--trace_file",
-                      type=str,
-                      default=None,
-                      help="File to write TensorFlow trace.")
+  parser.add_argument("--do_train",
+                      default=False,
+                      action='store_true',
+                      help="Whether to run training.")
+  parser.add_argument("--do_eval",
+                      default=False,
+                      action='store_true',
+                      help="Whether to run evaluation.")
+  parser.add_argument("--data_format",
+                      choices=['NHWC', 'NCHW'],
+                      default="NCHW",
+                      help="Data format to use. Recommended: NHWC for CPUs, "
+                           "and NCHW for GPUs.")
   parser.add_argument("--tfprof_file",
                       type=str,
                       default=None,
@@ -153,19 +150,6 @@ def define_flags():
                       type=str,
                       default=None,
                       help="Path where model checkpoints will be written.")
-  parser.add_argument("--do_train",
-                      default=False,
-                      action='store_true',
-                      help="Whether to run training.")
-  parser.add_argument("--do_eval",
-                      default=False,
-                      action='store_true',
-                      help="Whether to run evaluation.")
-  parser.add_argument("--data_format",
-                      choices=['NHWC', 'NCHW'],
-                      default="NCHW",
-                      help="Data format to use. Recommended: NHWC for CPUs, "
-                           "and NCHW for GPUs.")
 
 # Flags for NLP models
   parser.add_argument("--vocab_file",
