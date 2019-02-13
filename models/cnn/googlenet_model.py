@@ -25,15 +25,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models import model
+from models.cnn import model
 
 
-class GooglenetModel(model.CNNModel):
+class GooglenetModel(model.Model):
   """GoogLeNet."""
 
   def __init__(self, params=None):
     super(GooglenetModel, self).__init__(
-        'googlenet', 224, 32, 0.005, params=params)
+        224, 32, 0.005, params=params)
 
   def add_inference(self, cnn):
 

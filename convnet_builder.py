@@ -33,15 +33,15 @@ class ConvNetBuilder(object):
   """Builder of convolutional neural networks."""
 
   def __init__(self,
-               images,
+               input_op,
                image_depth,
-               training,
+               is_training,
                data_format='NCHW',
                dtype=tf.float32,
                variable_dtype=tf.float32):
-    self.top_layer = images
+    self.top_layer = input_op
     self.top_size = image_depth
-    self.phase_train = training
+    self.phase_train = is_training
     self.data_format = data_format
     self.dtype = dtype
     self.variable_dtype = variable_dtype
@@ -103,7 +103,6 @@ class ConvNetBuilder(object):
            d_width=1,
            mode='SAME',
            input_layer=None,
-           num_channels_in=None,
            use_batch_norm=None,
            stddev=None,
            activation='relu',
@@ -127,14 +126,16 @@ class ConvNetBuilder(object):
                                   kernel_size=[k_height, k_width],
                                   strides=[d_height, d_width], padding=mode,
                                   data_format = self.channel_pos,
-                                  kernel_initializer=kernel_initializer)
+                                  kernel_initializer=kernel_initializer,
+                                  use_bias=False)
       else:  # Special padding mode for ResNet models
         if d_height == 1 and d_width == 1:
           conv = conv_layers.conv2d(input_layer, num_out_channels,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width], padding='SAME',
                                     data_format = self.channel_pos,
-                                    kernel_initializer=kernel_initializer)
+                                    kernel_initializer=kernel_initializer,
+                                    use_bias=False)
         else:
           pad_h_beg = (k_height - 1) // 2
           pad_h_end = k_height - 1 - pad_h_beg
@@ -150,7 +151,8 @@ class ConvNetBuilder(object):
                                     strides=[d_height, d_width],
                                     padding='VALID',
                                     data_format = self.channel_pos,
-                                    kernel_initializer=kernel_initializer)
+                                    kernel_initializer=kernel_initializer,
+                                    use_bias=False)
       if use_batch_norm is None:
         use_batch_norm = self.use_batch_norm
       if not use_batch_norm:

@@ -55,8 +55,7 @@ import math
 import os
 
 import tensorflow as tf
-
-#from official.utils.misc import model_helpers
+from tensorflow.python.util import nest
 
 # Buffer size for reading records from a TFRecord file. Each training file is
 # 7.2 MB, so 8 MB allows an entire file to be kept in memory.
@@ -80,8 +79,10 @@ def _parse_example(serialized_example):
       "targets": tf.VarLenFeature(tf.int64)
   }
   parsed = tf.parse_single_example(serialized_example, data_fields)
-  inputs = tf.sparse_tensor_to_dense(parsed["inputs"])
-  targets = tf.sparse_tensor_to_dense(parsed["targets"])
+  inputs = tf.sparse.to_dense(parsed["inputs"])
+  targets = tf.sparse.to_dense(parsed["targets"])
+  #inputs = tf.sparse_tensor_to_dense(parsed["inputs"])
+  #targets = tf.sparse_tensor_to_dense(parsed["targets"])
   return inputs, targets
 
 
@@ -183,7 +184,7 @@ def _batch_examples(dataset, batch_size, max_length):
     # lengths as well. Resulting lengths of inputs and targets can differ.
     return grouped_dataset.padded_batch(bucket_batch_size, ([None], [None]))
 
-  return dataset.apply(tf.contrib.data.group_by_window(
+  return dataset.apply(tf.data.experimental.group_by_window(
       key_func=example_to_bucket_id,
       reduce_func=batching_fn,
       window_size=None,
@@ -223,7 +224,7 @@ def _read_and_batch_from_files(
   # Read files and interleave results. When training, the order of the examples
   # will be non-deterministic.
   dataset = dataset.apply(
-      tf.contrib.data.parallel_interleave(
+      tf.data.experimental.parallel_interleave(
           _load_records, sloppy=shuffle, cycle_length=num_parallel_calls))
 
   # Parse each tf.Example into a dictionary
@@ -249,18 +250,16 @@ def _read_and_batch_from_files(
 
 
 def _generate_synthetic_data(params):
-  """Create synthetic data based on the parameter batch size."""
+  """Create synthetic data based on batch size."""
   batch = length = int(math.sqrt(params["batch_size"]))
-  #return model_helpers.generate_synthetic_data(
-  #    input_shape=tf.TensorShape([batch, length]),
-  #    input_value=1,
-  #    input_dtype=tf.int32,
-  #    label_shape=tf.TensorShape([batch, length]),
-  #    label_value=1,
-  #    label_dtype=tf.int32,
-  #)
-  raise NotImplementedError("Cannot use synthetic data now")
+  element = input_element = nest.map_structure(
+      lambda s: tf.constant(1, tf.int32, s), tf.TensorShape([batch, length]))
 
+  label_element = nest.map_structure(
+      lambda s: tf.constant(1, tf.int32, s), tf.TensorShape([batch, length]))
+  element = (input_element, label_element)
+
+  return tf.data.Dataset.from_tensors(element).repeat()
 
 def train_input_fn(params):
   """Load and return dataset of batched examples for use during training."""

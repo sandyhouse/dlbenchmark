@@ -25,19 +25,19 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models import model
+from models.cnn import model
 
 
-class AlexnetModel(model.CNNModel):
+class AlexnetModel(model.Model):
   """Original Alexnet cnn model."""
 
   def __init__(self, params=None):
     super(AlexnetModel, self).__init__(
-        'alexnet', 224 + 3, 512, 0.005, params=params)
+        224, 512, 0.005, params=params)
 
   def add_inference(self, cnn):
     # Note: VALID requires padding the images by 3 in width and height
-    cnn.conv(64, 11, 11, 4, 4, 'VALID')
+    cnn.conv(64, 11, 11, 4, 4)
     cnn.mpool(3, 3, 2, 2)
     cnn.conv(192, 5, 5)
     cnn.mpool(3, 3, 2, 2)
@@ -52,7 +52,7 @@ class AlexnetModel(model.CNNModel):
     cnn.dropout()
 
 
-class AlexnetCifar10Model(model.CNNModel):
+class AlexnetCifar10Model(model.Model):
   """Alexnet cnn model for cifar datasets.
 
   The model architecture follows the one defined in the tensorflow tutorial
@@ -64,7 +64,7 @@ class AlexnetCifar10Model(model.CNNModel):
 
   def __init__(self, params=None):
     super(AlexnetCifar10Model, self).__init__(
-        'alexnet', 32, 128, 0.1, params=params)
+        32, 128, 0.1, nclass=10, params=params)
 
   def add_inference(self, cnn):
     cnn.conv(64, 5, 5, 1, 1, 'SAME', stddev=5e-2)

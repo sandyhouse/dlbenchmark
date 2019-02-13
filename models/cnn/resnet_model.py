@@ -37,7 +37,7 @@ from __future__ import print_function
 import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-from models import model as model_lib
+from models.cnn import model
 
 IMAGENET_NUM_TRAIN_IMAGES = 1281167
 
@@ -79,7 +79,6 @@ def bottleneck_block_v1(cnn, depth, depth_bottleneck, stride):
     output = tf.nn.relu(shortcut + res)
     cnn.top_layer = output
     cnn.top_size = depth
-
 
 def bottleneck_block_v1_5(cnn, depth, depth_bottleneck, stride):
   """Bottleneck block with identity short-cut for ResNet v1.5.
@@ -128,7 +127,6 @@ def bottleneck_block_v1_5(cnn, depth, depth_bottleneck, stride):
     cnn.top_layer = output
     cnn.top_size = depth
 
-
 def bottleneck_block_v2(cnn, depth, depth_bottleneck, stride):
   """Bottleneck block with identity short-cut for ResNet v2.
 
@@ -172,7 +170,6 @@ def bottleneck_block_v2(cnn, depth, depth_bottleneck, stride):
     output = shortcut + res
     cnn.top_layer = output
     cnn.top_size = depth
-
 
 def bottleneck_block(cnn, depth, depth_bottleneck, stride, version):
   """Bottleneck block with identity short-cut.
@@ -244,8 +241,7 @@ def residual_block(cnn, depth, stride, version, projection_shortcut=False):
   cnn.top_layer = output
   cnn.top_size = depth
 
-
-class ResnetModel(model_lib.CNNModel):
+class ResnetModel(model.Model):
   """Resnet cnn network configuration."""
 
   def __init__(self, model, layer_counts, params=None):
@@ -264,11 +260,10 @@ class ResnetModel(model_lib.CNNModel):
     # The ResNet paper uses a starting lr of .1 at bs=256.
     self.base_lr_batch_size = 256
     base_lr = 0.128
-    if params and params.resnet_base_lr:
-      base_lr = params.resnet_base_lr
+    self.layers_counts = layer_counts
 
-    super(ResnetModel, self).__init__(model, 224, batch_size, base_lr,
-                                      layer_counts, params=params)
+    super(ResnetModel, self).__init__(224, batch_size, base_lr,
+                                      params=params)
     if 'v2' in model:
       self.version = 'v2'
     elif 'v1.5' in model:
@@ -278,7 +273,7 @@ class ResnetModel(model_lib.CNNModel):
 
   def add_inference(self, cnn):
     if self.layer_counts is None:
-      raise ValueError('Layer counts not specified for %s' % self.get_model())
+      raise ValueError('Layer counts not specified.')
     # Drop batch size from shape logging.
     cnn.use_batch_norm = True
     cnn.batch_norm_config = {'decay': 0.9, 'epsilon': 1e-5, 'scale': True}
@@ -362,7 +357,7 @@ def create_resnet152_v2_model(params):
   return ResnetModel('resnet152_v2', (3, 8, 36, 3), params=params)
 
 
-class ResnetCifar10Model(model_lib.CNNModel):
+class ResnetCifar10Model(model.Model):
   """Resnet cnn network configuration for Cifar 10 dataset.
 
   V1 model architecture follows the one defined in the paper:
@@ -378,11 +373,12 @@ class ResnetCifar10Model(model_lib.CNNModel):
     else:
       self.version = 'v1'
     super(ResnetCifar10Model, self).__init__(
-        model, 32, 128, 0.1, layer_counts, params=params)
+        32, 128, 0.1, nclass=10, params=params)
+    self.layer_counts = layer_counts
 
   def add_inference(self, cnn):
     if self.layer_counts is None:
-      raise ValueError('Layer counts not specified for %s' % self.get_model())
+      raise ValueError('Layer counts not specified.')
 
     cnn.use_batch_norm = True
     cnn.batch_norm_config = {'decay': 0.9, 'epsilon': 1e-5, 'scale': True}

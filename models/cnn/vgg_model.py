@@ -28,7 +28,7 @@ from __future__ import division
 from __future__ import print_function
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
-from models import model
+from models.cnn import model
 
 
 def _construct_vgg(cnn, num_conv_layers):
@@ -56,28 +56,28 @@ def _construct_vgg(cnn, num_conv_layers):
   cnn.dropout()
 
 
-class Vgg11Model(model.CNNModel):
+class Vgg11Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg11Model, self).__init__('vgg11', 224, 64, 0.005, params=params)
+    super(Vgg11Model, self).__init__(224, 64, 0.005, params=params)
 
   def add_inference(self, cnn):
     _construct_vgg(cnn, [1, 1, 2, 2, 2])
 
 
-class Vgg16Model(model.CNNModel):
+class Vgg16Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg16Model, self).__init__('vgg16', 224, 64, 0.005, params=params)
+    super(Vgg16Model, self).__init__(224, 64, 0.005, params=params)
 
   def add_inference(self, cnn):
     _construct_vgg(cnn, [2, 2, 3, 3, 3])
 
 
-class Vgg19Model(model.CNNModel):
+class Vgg19Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg19Model, self).__init__('vgg19', 224, 64, 0.005, params=params)
+    super(Vgg19Model, self).__init__(224, 64, 0.005, params=params)
 
   def add_inference(self, cnn):
     _construct_vgg(cnn, [2, 2, 4, 4, 4])

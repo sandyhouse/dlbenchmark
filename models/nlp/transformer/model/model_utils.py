@@ -108,3 +108,5 @@ def get_padding_bias(x):
     attention_bias = tf.expand_dims(
         tf.expand_dims(attention_bias, axis=1), axis=1)
   return attention_bias
+
+
