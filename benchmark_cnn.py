@@ -188,7 +188,7 @@ class BenchmarkCNN(object):
 
     self.num_epochs = self.params.num_epochs
 
-    self.use_synthetic_data = True if self.params.data_dir else False
+    self.use_synthetic_data = False if self.params.data_dir else True
     self.data_dir = self.params.data_dir
 
     self.optimizer = self.params.optimizer
@@ -235,6 +235,7 @@ class BenchmarkCNN(object):
     print('Batch size:  %s global (per machine)' % (
            self.batch_size))
     print('             %s per device' % (self.batch_size_per_device))
+    print('Num GPUs:    %d per worker' % (self.num_gpus))
     print('Num epochs:  %d' % self.num_epochs)
     print('Data format: %s' % self.data_format)
     print('Optimizer:   %s' % self.optimizer)
@@ -244,7 +245,7 @@ class BenchmarkCNN(object):
   def run(self):
     """Run the benchmark task assigned to this process."""
     distribution_strategy = utils.get_distribution_strategy(
-        self.params.num_gpus, self.params.all_reduce_spec)
+        self.num_gpus, self.all_reduce_spec)
     
     # Create session config. allow_soft_placement = True, is required for
     # multi-GPU and is not harmful for other modes.
@@ -264,7 +265,7 @@ class BenchmarkCNN(object):
         config=run_config,
         params=self.params)
 
-    if self.params.data_dir:
+    if not self.use_synthetic_data:
       input_function = datasets.input_fn
     else:
       input_function = datasets.get_synth_input_fn(self.data_type)
@@ -272,8 +273,8 @@ class BenchmarkCNN(object):
     def input_fn_train(num_epochs):
       return input_function(
               is_training=True,
-              data_dir=self.output_dir,
-              batch_size=self.batch_size,
+              data_dir=self.data_dir,
+              batch_size=self.batch_size_per_device,
               num_epochs=num_epochs,
               dtype=self.data_type,
               )
@@ -281,19 +282,20 @@ class BenchmarkCNN(object):
     def input_fn_eval():
       return input_function(
               is_training=False,
-              data_dir=self.output_dir,
-              batch_size=self.batch_size,
+              data_dir=self.data_dir,
+              batch_size=self.batch_size_per_device,
               num_epochs=1,
               dtype=self.data_type)
 
+    time_hist = TimeHistory()
+
     if self.do_train:
-      start_time = time.time()
-      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), max_steps=1)
-      end_time = time.time()
-      elapsed_time = end_time - start_time
-      print("Training time: {}".format(elapsed_time))
-      num_images = self.num_epochs * datasets.NUM_IMAGES['train']
-      images_per_sec = float(num_images) / elapsed_time
-      print("Images per second: {}".format(images_per_sec))
+      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
+                       hooks=[time_hist]steps=1)
+      total_time = sum(time_hist.times)
+      print(f"Totoal time with {self.num_gpus} GPU(s): {total_time} seconds.")
+
+      avg_time_per_batch = np.mean(time_hist.times)
+      print(f"{self.batch/avg_time_per_batch} images/second.")
     else:
       classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))
