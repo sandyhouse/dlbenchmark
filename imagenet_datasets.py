@@ -131,7 +131,7 @@ def input_fn(is_training, data_dir, batch_size, num_epochs=1, dtype=tf.float32,
       lambda value: parse_record_fn(value, dtype),
       batch_size=batch_size,
       num_parallel_batches=num_parallel_batches,
-      drop_remainder=True if is_training else False))
+      drop_remainder=False))
 
   # Operations between the final prefetch and the get_next call to the iterator
   # will happen synchronously during run time. We prefetch here again to 

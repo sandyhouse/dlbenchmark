@@ -287,7 +287,6 @@ class ConvNetBuilder(object):
           ltype, args = layer[0], layer[1:]
           kwargs = {
               'input_layer': input_layer,
-              'num_channels_in': in_size
           } if l == 0 else {}
           if ltype == 'conv':
             self.conv(*args, **kwargs)

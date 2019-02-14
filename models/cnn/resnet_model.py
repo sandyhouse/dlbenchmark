@@ -68,10 +68,9 @@ def bottleneck_block_v1(cnn, depth, depth_bottleneck, stride):
       shortcut = cnn.conv(
           depth, 1, 1, stride, stride, activation=None,
           use_batch_norm=True, input_layer=input_layer,
-          num_channels_in=in_size, bias=None)
+          bias=None)
     cnn.conv(depth_bottleneck, 1, 1, stride, stride,
-             input_layer=input_layer, num_channels_in=in_size,
-             use_batch_norm=True, bias=None)
+             input_layer=input_layer, use_batch_norm=True, bias=None)
     cnn.conv(depth_bottleneck, 3, 3, 1, 1, mode='SAME_RESNET',
              use_batch_norm=True, bias=None)
     res = cnn.conv(depth, 1, 1, 1, 1, activation=None,
@@ -114,11 +113,9 @@ def bottleneck_block_v1_5(cnn, depth, depth_bottleneck, stride):
     else:
       shortcut = cnn.conv(
           depth, 1, 1, stride, stride, activation=None,
-          use_batch_norm=True, input_layer=input_layer,
-          num_channels_in=in_size, bias=None)
+          use_batch_norm=True, input_layer=input_layer, bias=None)
     cnn.conv(depth_bottleneck, 1, 1, 1, 1,
-             input_layer=input_layer, num_channels_in=in_size,
-             use_batch_norm=True, bias=None)
+             input_layer=input_layer, use_batch_norm=True, bias=None)
     cnn.conv(depth_bottleneck, 3, 3, stride, stride, mode='SAME_RESNET',
              use_batch_norm=True, bias=None)
     res = cnn.conv(depth, 1, 1, 1, 1, activation=None,
@@ -159,10 +156,9 @@ def bottleneck_block_v2(cnn, depth, depth_bottleneck, stride):
     else:
       shortcut = cnn.conv(
           depth, 1, 1, stride, stride, activation=None, use_batch_norm=False,
-          input_layer=preact, num_channels_in=in_size, bias=None)
+          input_layer=preact, bias=None)
     cnn.conv(depth_bottleneck, 1, 1, stride, stride,
-             input_layer=preact, num_channels_in=in_size,
-             use_batch_norm=True, bias=None)
+             input_layer=preact, use_batch_norm=True, bias=None)
     cnn.conv(depth_bottleneck, 3, 3, 1, 1, mode='SAME_RESNET',
              use_batch_norm=True, bias=None)
     res = cnn.conv(depth, 1, 1, 1, 1, activation=None,
@@ -228,8 +224,7 @@ def residual_block(cnn, depth, stride, version, projection_shortcut=False):
   else:
     res = input_layer
   cnn.conv(depth, 3, 3, stride, stride,
-           input_layer=res, num_channels_in=in_size,
-           use_batch_norm=True, bias=None)
+           input_layer=res, use_batch_norm=True, bias=None)
   if pre_activation:
     res = cnn.conv(depth, 3, 3, 1, 1, activation=None,
                    use_batch_norm=False, bias=None)
@@ -260,7 +255,7 @@ class ResnetModel(model.Model):
     # The ResNet paper uses a starting lr of .1 at bs=256.
     self.base_lr_batch_size = 256
     base_lr = 0.128
-    self.layers_counts = layer_counts
+    self.layer_counts = layer_counts
 
     super(ResnetModel, self).__init__(224, batch_size, base_lr,
                                       params=params)
@@ -355,98 +350,3 @@ def create_resnet152_model(params):
 
 def create_resnet152_v2_model(params):
   return ResnetModel('resnet152_v2', (3, 8, 36, 3), params=params)
-
-
-class ResnetCifar10Model(model.Model):
-  """Resnet cnn network configuration for Cifar 10 dataset.
-
-  V1 model architecture follows the one defined in the paper:
-  https://arxiv.org/pdf/1512.03385.pdf.
-
-  V2 model architecture follows the one defined in the paper:
-  https://arxiv.org/pdf/1603.05027.pdf.
-  """
-
-  def __init__(self, model, layer_counts, params=None):
-    if 'v2' in model:
-      self.version = 'v2'
-    else:
-      self.version = 'v1'
-    super(ResnetCifar10Model, self).__init__(
-        32, 128, 0.1, nclass=10, params=params)
-    self.layer_counts = layer_counts
-
-  def add_inference(self, cnn):
-    if self.layer_counts is None:
-      raise ValueError('Layer counts not specified.')
-
-    cnn.use_batch_norm = True
-    cnn.batch_norm_config = {'decay': 0.9, 'epsilon': 1e-5, 'scale': True}
-    if self.version == 'v2':
-      cnn.conv(16, 3, 3, 1, 1, use_batch_norm=True)
-    else:
-      cnn.conv(16, 3, 3, 1, 1, activation=None, use_batch_norm=True)
-    for i in xrange(self.layer_counts[0]):
-      # reshape to batch_size x 16 x 32 x 32
-      residual_block(cnn, 16, 1, self.version)
-    for i in xrange(self.layer_counts[1]):
-      # Subsampling is performed at the first convolution with a stride of 2
-      stride = 2 if i == 0 else 1
-      # reshape to batch_size x 32 x 16 x 16
-      residual_block(cnn, 32, stride, self.version)
-    for i in xrange(self.layer_counts[2]):
-      stride = 2 if i == 0 else 1
-      # reshape to batch_size x 64 x 8 x 8
-      residual_block(cnn, 64, stride, self.version)
-    if self.version == 'v2':
-      cnn.batch_norm()
-      cnn.top_layer = tf.nn.relu(cnn.top_layer)
-    cnn.spatial_mean()
-
-  def get_learning_rate(self, global_step, batch_size):
-    num_batches_per_epoch = int(50000 / batch_size)
-    boundaries = num_batches_per_epoch * np.array([82, 123, 300],
-                                                  dtype=np.int64)
-    boundaries = [x for x in boundaries]
-    values = [0.1, 0.01, 0.001, 0.0002]
-    return tf.train.piecewise_constant(global_step, boundaries, values)
-
-
-def create_resnet20_cifar_model(params):
-  return ResnetCifar10Model('resnet20', (3, 3, 3), params=params)
-
-
-def create_resnet20_v2_cifar_model(params):
-  return ResnetCifar10Model('resnet20_v2', (3, 3, 3), params=params)
-
-
-def create_resnet32_cifar_model(params):
-  return ResnetCifar10Model('resnet32', (5, 5, 5), params=params)
-
-
-def create_resnet32_v2_cifar_model(params):
-  return ResnetCifar10Model('resnet32_v2', (5, 5, 5), params=params)
-
-
-def create_resnet44_cifar_model(params):
-  return ResnetCifar10Model('resnet44', (7, 7, 7), params=params)
-
-
-def create_resnet44_v2_cifar_model(params):
-  return ResnetCifar10Model('resnet44_v2', (7, 7, 7), params=params)
-
-
-def create_resnet56_cifar_model(params):
-  return ResnetCifar10Model('resnet56', (9, 9, 9), params=params)
-
-
-def create_resnet56_v2_cifar_model(params):
-  return ResnetCifar10Model('resnet56_v2', (9, 9, 9), params=params)
-
-
-def create_resnet110_cifar_model(params):
-  return ResnetCifar10Model('resnet110', (18, 18, 18), params=params)
-
-
-def create_resnet110_v2_cifar_model(params):
-  return ResnetCifar10Model('resnet110_v2', (18, 18, 18), params=params)

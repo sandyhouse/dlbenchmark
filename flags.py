@@ -60,18 +60,6 @@ def define_flags():
                       default="NCHW",
                       help="Data format to use. Recommended: NHWC for CPUs, "
                            "and NCHW for GPUs.")
-  parser.add_argument("--tfprof_file",
-                      type=str,
-                      default=None,
-                      help="File to write the tfprof ProfileProto. The "
-                           "performance and other aspects of the model can be "
-                           "analyzed with tfprof. See "
-                           "https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/profiler/g3doc/command_line.md "
-                           "for more information. Additionally, the top most "
-                           "time consuming ops will be showed. Note: profiling "
-                           "with tfprof is very slow, but most of the overhead "
-                           "is spent between steps. So profiling results are "
-                           "more accurate than the slowdown would suggest.")
   parser.add_argument("--optimizer",
                       choices=['momentum', 'sgd', 'rmsprop', 'adam'],
                       default="adam",

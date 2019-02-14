@@ -16,8 +16,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import time
 
+import tensorflow as tf
 
 from models.cnn import alexnet_model as alexnet
 from models.cnn import resnet_model as resnet
@@ -26,8 +27,6 @@ from models.cnn import vgg_model as vgg
 from models.cnn import trivial_model as trivial
 import imagenet_datasets as datasets
 import utils
-
- 
 
 def get_optimizer(params, learning_rate):
   """Returns the optimizer that should be used based on params."""
@@ -91,7 +90,7 @@ def model_fn(features, labels, mode, params):
     elif params.model == "vgg16":
       model = vgg.Vgg16Model(params)
     else:
-      raise ValueError("model {} not supported.".format(params.model))
+      raise ValueError("model `{}` not supported.".format(params.model))
 
     logits = model.build_network(features, mode==tf.estimator.ModeKeys.TRAIN)
     logits = tf.cast(logits, tf.float32)
@@ -124,6 +123,7 @@ def model_fn(features, labels, mode, params):
       train_op = None
 
     elif mode == tf.estimator.ModeKeys.TRAIN:
+      # FIXME: fix the params.batch_size based on num_gpus
       num_examples_per_epoch = datasets.NUM_IMAGES['train'] // params.batch_size
       global_step = tf.train.get_or_create_global_step()
       learning_rate = get_learning_rate(
@@ -137,11 +137,11 @@ def model_fn(features, labels, mode, params):
 
       optimizer = get_optimizer(params, learning_rate)
 
-      grad_vars = optimizer.compute_gradients(loss)
-      minimize_op = optimizer.apply_gradients(grad_vars, global_step)
+      #minimize_op = optimizer.minimize(loss, global_step=global_step)
+      train_op = optimizer.minimize(loss, global_step=global_step)
 
-      update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-      train_op = tf.group(minimize_op, update_ops)
+      #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      #train_op = tf.group(minimize_op, update_ops)
 
     accuracy = tf.metrics.accuracy(labels, predictions['classes'])
     accuracy_top_5 = tf.metrics.mean(
@@ -161,29 +161,6 @@ def model_fn(features, labels, mode, params):
             loss=loss,
             train_op=train_op,
             eval_metric_ops=metrics)
-
-
-def generate_tfprof_profile(profiler, tfprof_file):
-  """Generates a tfprof profile, writing it to a file and printing top ops.
-
-  Args:
-    profiler: A tf.profiler.Profiler. `profiler.add_step` must have already been
-      called.
-    tfprof_file: The filename to write the ProfileProto to.
-  """
-  profile_proto = profiler.serialize_to_string()
-  tf.logging.info('Dumping ProfileProto to %s' % tfprof_file)
-  with gfile.Open(tfprof_file, 'wb') as f:
-    f.write(profile_proto)
-
-  # Print out the execution times of the top operations. Note this
-  # information can also be obtained with the dumped ProfileProto, but
-  # printing it means tfprof doesn't have to be used if all the user wants
-  # is the top ops.
-  options = tf.profiler.ProfileOptionBuilder.time_and_memory()
-  options['max_depth'] = _NUM_OPS_TO_PRINT
-  options['order_by'] = 'accelerator_micros'
-  profiler.profile_operations(options)
 
 class BenchmarkCNN(object):
   """Class for benchmarking a cnn network."""
@@ -214,7 +191,6 @@ class BenchmarkCNN(object):
     self.use_synthetic_data = True if self.params.data_dir else False
     self.data_dir = self.params.data_dir
 
-    self.tfprof_file = self.params.tfprof_file
     self.optimizer = self.params.optimizer
     self.init_learning_rate = self.params.init_learning_rate
     self.num_epochs_per_decay = self.params.num_epochs_per_decay
@@ -240,12 +216,6 @@ class BenchmarkCNN(object):
     else:
       self.data_type = tf.float32
 
-    self.profiler = None
-    if self.tfprof_file:
-      profiler = tf.profiler.Profiler()
-      self.profiler = profiler
-      generate_tfprof_profile(profiler, self.tfprof_file)
-
     self.print_info()
     
   def print_info(self):
@@ -253,22 +223,22 @@ class BenchmarkCNN(object):
     dataset_name = "ImageNet-synthetic" if self.use_synthetic_data else (
                    "ImageNet")
     mode = ''
-    if self.params.do_train:
+    if self.do_train:
       mode += 'train '
-    if self.params.do_eval:
+    if self.do_eval:
       mode += 'eval '
 
     print()
-    print('Model:       %s' % self.params.model)
+    print('Model:       %s' % self.model)
     print('Dataset:     %s' % dataset_name)
     print('Mode:        %s' % mode)
     print('Batch size:  %s global (per machine)' % (
            self.batch_size))
-    print('             %s per device' % (self.params.batch_size))
+    print('             %s per device' % (self.batch_size_per_device))
     print('Num epochs:  %d' % self.num_epochs)
-    print('Data format: %s' % self.params.data_format)
-    print('Optimizer:   %s' % self.params.optimizer)
-    print('AllReduce:   %s' % self.params.all_reduce_spec)
+    print('Data format: %s' % self.data_format)
+    print('Optimizer:   %s' % self.optimizer)
+    print('AllReduce:   %s' % self.all_reduce_spec)
     print('=' * 30)
 
   def run(self):
@@ -317,6 +287,13 @@ class BenchmarkCNN(object):
               dtype=self.data_type)
 
     if self.do_train:
-      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs))
+      start_time = time.time()
+      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), max_steps=1)
+      end_time = time.time()
+      elapsed_time = end_time - start_time
+      print("Training time: {}".format(elapsed_time))
+      num_images = self.num_epochs * datasets.NUM_IMAGES['train']
+      images_per_sec = float(num_images) / elapsed_time
+      print("Images per second: {}".format(images_per_sec))
     else:
       classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))
