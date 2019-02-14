@@ -28,6 +28,16 @@ from models.cnn import trivial_model as trivial
 import imagenet_datasets as datasets
 import utils
 
+class TimeHistory(tf.train.SessionRunHook):
+  def begin(self):
+    self.times = []
+  
+  def before_run(self, run_context):
+    self.iter_time_start = time.time()
+  
+  def after_run(self, run_context, run_values):
+    self.times.append(time.time() - self.iter_time_start)
+
 def get_optimizer(params, learning_rate):
   """Returns the optimizer that should be used based on params."""
   if params.optimizer == 'momentum':
@@ -291,11 +301,13 @@ class BenchmarkCNN(object):
 
     if self.do_train:
       classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
-                       hooks=[time_hist]steps=1)
+                       hooks=[time_hist], steps=1)
       total_time = sum(time_hist.times)
-      print(f"Totoal time with {self.num_gpus} GPU(s): {total_time} seconds.")
+      print("Totoal time with {} GPU(s): {} seconds.".format(
+            self.num_gpus, total_time))
 
       avg_time_per_batch = np.mean(time_hist.times)
-      print(f"{self.batch/avg_time_per_batch} images/second.")
+      print("{self.batch/avg_time_per_batch} images/second.".format(
+            self.batch/avg_time_per_batch))
     else:
       classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))
