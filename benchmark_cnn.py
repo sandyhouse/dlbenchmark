@@ -179,6 +179,7 @@ class BenchmarkCNN(object):
     Raises:
       ValueError: Unsupported params settings.
     """
+    tf.logging.set_verbosity(tf.logging.INFO)
     self.params = params
 
     self.model = self.params.model
