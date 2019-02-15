@@ -61,12 +61,12 @@ def define_flags():
                       help="Data format to use. Recommended: NHWC for CPUs, "
                            "and NCHW for GPUs.")
   parser.add_argument("--optimizer",
-                      choices=['momentum', 'sgd', 'rmsprop', 'adam'],
+                      choices=['momentum', 'sgd', 'adam'],
                       default="adam",
                       help="Optimizer to use.")
   parser.add_argument("--init_learning_rate",
                       type=float,
-                      default=5e-5,
+                      default=0.1,
                       help="Initial learning rate to use.")
   parser.add_argument("--num_epochs_per_decay",
                       type=int,
@@ -76,7 +76,7 @@ def define_flags():
                       type=float,
                       default=0,
                       help="Learning rate decay factor every "
-                           "`num_epochs_per_decay` epochs.")
+                           "`--num_epochs_per_decay` epochs.")
   parser.add_argument("--minimum_learning_rate",
                       type=float,
                       default=0.0,
@@ -87,18 +87,6 @@ def define_flags():
                       type=float,
                       default=0.9,
                       help="Momentum for training.")
-  parser.add_argument("--rmsprop_decay",
-                      type=float,
-                      default=0.9,
-                      help="Decay term for rmsprop.")
-  parser.add_argument("--rmsprop_momentum",
-                      type=float,
-                      default=0.0,
-                      help="Momentum in rmsprop.")
-  parser.add_argument("--rmsprop_epsilon",
-                      type=float,
-                      default=1.0e-10,
-                      help="Epsilon term for rmsprop.")
   parser.add_argument("--adam_beta1",
                       type=float,
                       default=0.9,
@@ -134,10 +122,10 @@ def define_flags():
                       type=int,
                       default=5,
                       help="Maximum number of checkpoints to keep.")
-  parser.add_argument("--output_dir",
+  parser.add_argument("--model_dir",
                       type=str,
-                      default=None,
-                      help="Path where model checkpoints will be written.")
+                      default='/tmp',
+                      help="Path where model checkpoints will be stored.")
 
 # Flags for NLP models
   parser.add_argument("--vocab_file",

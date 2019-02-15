@@ -17,6 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import time
+import numpy as np
 
 import tensorflow as tf
 
@@ -29,14 +30,15 @@ import imagenet_datasets as datasets
 import utils
 
 class TimeHistory(tf.train.SessionRunHook):
+  """Record the run time for each iteration of training/evaluation."""
   def begin(self):
     self.times = []
   
   def before_run(self, run_context):
-    self.iter_time_start = time.time()
+    self.time_start = time.time()
   
   def after_run(self, run_context, run_values):
-    self.times.append(time.time() - self.iter_time_start)
+    self.times.append(time.time() - self.time_start)
 
 def get_optimizer(params, learning_rate):
   """Returns the optimizer that should be used based on params."""
@@ -307,7 +309,6 @@ class BenchmarkCNN(object):
             self.num_gpus, total_time))
 
       avg_time_per_batch = np.mean(time_hist.times)
-      print("{self.batch/avg_time_per_batch} images/second.".format(
-            self.batch/avg_time_per_batch))
+      print("{} images/second.".format(self.batch_size/avg_time_per_batch))
     else:
       classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))

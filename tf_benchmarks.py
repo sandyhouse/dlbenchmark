@@ -58,16 +58,8 @@ def _validate_flags(params):
     print("Please specify one of the above models.")
     exit()
   
-  count = 0
-  if params.do_train:
-    count += 1
-  if params.do_eval:
-    count += 1
-  if count == 0:
-    print("One of `--do_train` or `--do_eval` should be specified.")
-    exit()
-  if count > 1:
-    print("At most one of `--do_train` and `--do_eval` can be specified.")
+  if not params.do_train and not params.do_eval:
+    print("At least one of `--do_train` or `--do_eval` should be specified.")
     exit()
   
   if((params.num_epochs_per_decay or
@@ -88,9 +80,20 @@ def _validate_flags(params):
           "to be set.")
     exit()
 
+  if params.fp16_vars and not params.use_fp16:
+    print('If `--fp16_vars` is specified, set `--use_fp16` to True at the same '
+          'time.')
+    exit()
+
   if (params.use_fp16 and params.fp16_vars and
       params.all_reduce_spec and 'nccl' in params.all_reduce_spec):
     print('fp16 variables are not supported with NCCL.')
+    exit()
+  
+
+  if (params.num_gpus == 0 and params.data_format != 'NHWC') or (
+      params.num_gpus and params.data_format != 'NCHW'):
+    print("Recommend: 'NHWC' for CPU and 'NCHW' for GPU")
     exit()
 
 def main(params):
