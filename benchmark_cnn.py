@@ -47,12 +47,6 @@ def get_optimizer(params, learning_rate):
         learning_rate, params.momentum, use_nesterov=True)
   elif params.optimizer == 'sgd':
     opt = tf.train.GradientDescentOptimizer(learning_rate)
-  elif params.optimizer == 'rmsprop':
-    opt = tf.train.RMSPropOptimizer(
-        learning_rate,
-        params.rmsprop_decay,
-        momentum=params.rmsprop_momentum,
-        epsilon=params.rmsprop_epsilon)
   elif params.optimizer == 'adam':
     opt = tf.train.AdamOptimizer(learning_rate, params.adam_beta1,
                                  params.adam_beta2, params.adam_epsilon)
@@ -209,9 +203,6 @@ class BenchmarkCNN(object):
     self.learning_rate_decay_factor = self.params.learning_rate_decay_factor
     self.minimum_learning_rate = self.params.minimum_learning_rate
     self.momentum = self.params.momentum
-    self.rmsprop_decay = self.params.rmsprop_decay
-    self.rmsprop_momentum = self.params.rmsprop_momentum
-    self.rmsprop_epsilon = self.params.rmsprop_epsilon
     self.adam_beta1 = self.params.adam_beta1
     self.adam_beta2 = self.params.adam_beta2
     self.adam_epsilon = self.params.adam_epsilon
@@ -220,7 +211,7 @@ class BenchmarkCNN(object):
     self.all_reduce_spec = self.params.all_reduce_spec
     self.save_checkpoints_steps = self.params.save_checkpoints_steps
     self.max_chkpts_to_keep = self.params.max_chkpts_to_keep
-    self.output_dir = self.params.output_dir
+    self.model_dir = self.params.model_dir
     self.data_format = self.params.data_format
 
     if self.use_fp16 and self.fp16_vars:
@@ -273,7 +264,7 @@ class BenchmarkCNN(object):
 
     classifier = tf.estimator.Estimator(
         model_fn=model_fn, 
-        model_dir=self.output_dir,
+        model_dir=self.model_dir,
         config=run_config,
         params=self.params)
 
@@ -299,16 +290,20 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    time_hist = TimeHistory()
+    time_hist = TimeHistory(self.batch_size)
 
     if self.do_train:
       classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
-                       hooks=[time_hist], steps=1)
+                       hooks=[time_hist])
       total_time = sum(time_hist.times)
       print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
 
-      avg_time_per_batch = np.mean(time_hist.times)
-      print("{} images/second.".format(self.batch_size/avg_time_per_batch))
+      max_time = np.argmax(time_hist.times)
+      min_time = np.argmin(time_hist.times)
+      avg_time = np.mean(time_hist.times) # per batch
+      print("{} images/second (avg).".format(self.batch_size/avg_time))
+      print("{} images/second (max).".format(self.batch_size/max_time))
+      print("{} images/second (min).".format(self.batch_size/min_time))
     else:
       classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))

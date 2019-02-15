@@ -225,7 +225,14 @@ def get_synth_input_fn(dtype):
         dtype=tf.int32,
         name='synthetic_labels')
 
-    data = tf.data.Dataset.from_tensors((inputs, labels)).repeat()
+    num_images = NUM_IMAGES['train'] if is_training else (
+            NUM_IMAGES['validation'])
+
+    num_images = num_images * kwargs['num_epochs']
+
+    repeated_num = (num_images + batch_size - 1) // batch_size
+
+    data = tf.data.Dataset.from_tensors((inputs, labels)).repeat(repeated_num)
     data = data.prefetch(buffer_size=tf.contrib.data.AUTOTUNE)
 
     return data
