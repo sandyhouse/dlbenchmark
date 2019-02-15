@@ -118,6 +118,18 @@ def define_flags():
                       type=int,
                       default=None,
                       help="How often to save trained models.")
+  parser.add_argument("--ip_list",
+                      type=str,
+                      default=None,
+                      help="iplist imported by mpirun (for slurm).")
+  parser.add_argument("--job_name",
+                      type=str,
+                      default=None,
+                      help="Name of the job, e.g., 'worker', 'ps', etc.")
+  parser.add_argument("--job_index",
+                      type=int,
+                      default=None,
+                      help="Index of the job, e.g., 0, 1, etc.")
   parser.add_argument("--max_chkpts_to_keep",
                       type=int,
                       default=5,
@@ -132,10 +144,6 @@ def define_flags():
                      type=str,
                      default=None,
                      help="The vocabulary file to train on.")
-  parser.add_argument("--init_checkpoint",
-                     type=str,
-                     default=None,
-                     help="Initial checkpoint from a pre-trained model.")
   parser.add_argument("--max_seq_length",
                      type=int,
                      default=128,

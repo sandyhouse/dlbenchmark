@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import json
+
 import tensorflow as tf
 
 import utils
@@ -96,9 +99,37 @@ def _validate_flags(params):
     print("Recommend: 'NHWC' for CPU and 'NCHW' for GPU")
     exit()
 
+  if params.ip_list:
+    if params.job_name == None or params.job_index == None:
+      print("`--job_name` and `--job_index` should both be specified for "
+            "distributed training/evaluation. ")
+      exit()
+
 def main(params):
   """Run the benchmark."""
   _validate_flags(params)
+
+  if params.ip_list:
+    ips = params.ip_list.split(',')
+
+    TF_CONFIG = {}
+    addresses = []
+    if params.job_name == 'ps':
+      port = '5000'
+    else:
+      port = '5001'
+
+    for ip in ips:
+      address = ip + ":" + port
+      addresses.append(address)
+    
+    TF_CONFIG['cluster'] = {params.job_name : addresses}
+    TF_CONFIG['task'] = {
+            'type': params.job_name,
+            'index': params.job_index,
+    }
+
+    os.environ["TF_CONFIG"] = json.dumps(TF_CONFIG)
 
   tf_version = utils.get_tensorflow_version()
   print('TensorFlow:  %i.%i' % (tf_version[0], tf_version[1]))

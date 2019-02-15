@@ -62,7 +62,7 @@ class BenchmarkNLP(object):
         config = model_params.BASE_MULTI_GPU_PARAMS
 
     config['data_dir'] = self.params.data_dir
-    config['model_dir'] = self.params.output_dir
+    config['model_dir'] = self.params.model_dir
     config['num_parallel_calls'] = self.params.num_parallel_calls
     config['static_batch'] = self.params.static_batch
     config['allow_ffn_pad'] = True
@@ -77,7 +77,7 @@ class BenchmarkNLP(object):
                     self.params.batch_size, total_batch_size))
 
     schedule_manager = schedule.Manager(
-            train_steps=self.params.num_batches,
+            train_steps=None,
             steps_between_evals=10,
             train_epochs=self.params.num_epochs,
             epochs_between_evals=1,
@@ -112,12 +112,7 @@ class BenchmarkNLP(object):
     }
 
     tokenization.validate_case_matches_checkpoint(self.params.do_lower_case,
-                                                  self.params.init_checkpoint)
-
-    if not self.params.do_train and not self.params.do_eval and (
-                  not self.params.do_predict):
-      raise ValueError("At least one of 'do_train', 'do_eval' or 'do_predict' "
-                       "must be set.")
+                                                  self.params.model_dir)
 
     bert_config = bert_model.BertConfig.from_json_file(
             self.params.bert_config_file)
@@ -128,7 +123,7 @@ class BenchmarkNLP(object):
                        (self.params.max_seq_length, 
                            bert_config.max_position_embeddings))
 
-    tf.gfile.MakeDirs(self.params.output_dir)
+    #tf.gfile.MakeDirs(self.params.output_dir)
 
     task_name= self.params.task_name
     if task_name not in processors:
@@ -142,7 +137,7 @@ class BenchmarkNLP(object):
             do_lower_case=self.params.do_lower_case)
 
     run_config = tf.estimator.RunConfig(
-            model_dir=self.params.output_dir,
+            model_dir=self.params.model_dir,
             save_checkpoints_steps=self.params.save_checkpoints_steps)
     
     train_examples = None
@@ -155,17 +150,14 @@ class BenchmarkNLP(object):
         num_train_steps = int(
             len(train_examples) / self.params.batch_size * (
                 self.params.num_epochs))
-      elif self.params.num_batches:
-        num_train_steps = self.params.num_batches
       else:
         num_train_steps = int(len(train_examples) / self.params.batch_size)
-      num_warmup_steps = (int(self.params.num_warmup_batches) 
-            if self.params.num_warmup_batches else 0)
+      num_warmup_steps = 0
 
     model_fn = bert_helper.model_fn_builder(
             bert_config=bert_config,
             num_labels=len(label_list),
-            init_checkpoint=self.params.init_checkpoint,
+            init_checkpoint=self.params.model_dir,
             learning_rate=self.params.init_learning_rate,
             num_train_steps=num_train_steps,
             num_warmup_steps=num_warmup_steps)
@@ -175,7 +167,7 @@ class BenchmarkNLP(object):
             config=run_config)
 
     if self.params.do_train:
-      train_file = os.path.join(self.params.output_dir, "train.tf_record")
+      train_file = os.path.join(self.params.data_dir, "train.tf_record")
       bert_helper.file_based_convert_examples_to_features(
             train_examples, label_list, self.params.max_seq_length, tokenizer,
             train_file)
@@ -197,7 +189,7 @@ class BenchmarkNLP(object):
 
       num_eval_steps = int(num_actual_eval_examples / self.params.batch_size)
 
-      eval_file = os.path.join(self.params.output_dir, "eval.tf_record")
+      eval_file = os.path.join(self.params.data_dir, "eval.tf_record")
       bert_helper.file_based_convert_examples_to_features(
               eval_examples, label_list, self.params.max_seq_length, tokenizer,
               eval_file)
@@ -217,7 +209,7 @@ class BenchmarkNLP(object):
       result = estimator.evaluate(input_fn=eval_input_fn,
                                   steps=num_eval_steps)
 
-      output_eval_file = os.path.join(self.params.output_dir, 
+      output_eval_file = os.path.join(self.params.model_dir, 
                                       "eval_results.txt")
       with tf.gfile.GFile(output_eval_file, "w") as writer:
         tf.logging.info("***** Eval results *****")
@@ -229,7 +221,7 @@ class BenchmarkNLP(object):
       predict_examples = processor.get_test_examples(self.params.data_dir)
       num_actual_predict_examples = len(predict_examples)
 
-      predict_file = os.path.join(self.params.output_dir, "predict.tf_record")
+      predict_file = os.path.join(self.params.data_dir, "predict.tf_record")
       bert_helper.file_based_convert_examples_to_features(
               predict_examples, label_list, self.params.max_seq_length,
               tokenizer, predict_file)
