@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-
 def get_tensorflow_version():
   version = tf.__version__
   major, minor, _ = version.split('.')
@@ -61,8 +60,8 @@ def get_distribution_strategy(num_gpus,
             "'True'".format(num_gpus))
   else:
     if all_reduce_alg:
-      return tf.contrib.distribute.AllReduceCrossDeviceOps(
-              all_reduce_alg, num_packs=2)
+      return tf.contrib.distribute.CollectiveAllReduceStrategy(
+              num_gpus_per_worker=num_gpus)
     else:
       return tf.contrib.distribute.MirroredStrategy(num_gpus=num_gpus)
 

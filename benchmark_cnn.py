@@ -291,7 +291,7 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    time_hist = TimeHistory(self.batch_size)
+    time_hist = TimeHistory()
 
     if self.do_train:
       classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 

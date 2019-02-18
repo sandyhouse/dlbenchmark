@@ -112,7 +112,7 @@ class BenchmarkNLP(object):
     }
 
     tokenization.validate_case_matches_checkpoint(self.params.do_lower_case,
-                                                  self.params.model_dir)
+                                                  self.params.init_checkpoint)
 
     bert_config = bert_model.BertConfig.from_json_file(
             self.params.bert_config_file)
@@ -123,9 +123,9 @@ class BenchmarkNLP(object):
                        (self.params.max_seq_length, 
                            bert_config.max_position_embeddings))
 
-    #tf.gfile.MakeDirs(self.params.output_dir)
+    tf.gfile.MakeDirs(self.params.model_dir)
 
-    task_name= self.params.task_name
+    task_name= self.params.task_name.lower()
     if task_name not in processors:
       raise ValueError("Task '%s' not found." % (task_name))
 
@@ -157,7 +157,7 @@ class BenchmarkNLP(object):
     model_fn = bert_helper.model_fn_builder(
             bert_config=bert_config,
             num_labels=len(label_list),
-            init_checkpoint=self.params.model_dir,
+            init_checkpoint=self.params.init_checkpoint,
             learning_rate=self.params.init_learning_rate,
             num_train_steps=num_train_steps,
             num_warmup_steps=num_warmup_steps)
@@ -241,7 +241,7 @@ class BenchmarkNLP(object):
 
       result = estimator.predict(input_fn=predict_input_fn)
 
-      output_predict_file = os.path.join(self.params.output_dir, 
+      output_predict_file = os.path.join(self.params.model_dir, 
               "test_results.txt")
       with tf.gfile.GFile(output_predict_file, "w") as writer:
         num_written_lines = 0

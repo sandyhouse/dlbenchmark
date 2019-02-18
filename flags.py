@@ -25,6 +25,10 @@ parser = argparse.ArgumentParser(
 
 # Define commond line arguments for benchmarks
 def define_flags():
+  parser.add_argument("--backend",
+                      choices=['TensorFlow', 'PyTorch'],
+                      default="TensorFlow",
+                      help="The backend used for benchmarks.")
   parser.add_argument("--model",
                       type=str,
                       default=None,
@@ -138,6 +142,10 @@ def define_flags():
                       type=str,
                       default='/tmp',
                       help="Path where model checkpoints will be stored.")
+  parser.add_argument("--init_checkpoint",
+                      type=str,
+                      default=None,
+                      help="Path for the initial model checkpoint.")
 
 # Flags for NLP models
   parser.add_argument("--vocab_file",

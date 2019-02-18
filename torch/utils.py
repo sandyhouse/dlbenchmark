@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,36 +11,15 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Benchmark script for TensorFlow."""
-
+"""Utilities for pytorch benchmarks."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import json
+import torch
 
-import tensorflow as tf
+def get_torch_version():
+  version = torch.__version__
+  major, minor, patch , _ = version.split('.')
+  return (int(major), int(minor))
 
-import utils
-import flags
-import benchmark_cnn
-import benchmark_nlp
-
-# All supported NLP models to benchmark.
-NLP_MODELS = ['bert', 'transformer']
-
-def main(params):
-  """Run the benchmark."""
-  
-  tf_version = utils.get_tensorflow_version()
-  print('TensorFlow:  %i.%i' % (tf_version[0], tf_version[1]))
-
-  if params.model in NLP_MODELS:
-    print("Run benchmarks for nlp model.")
-    bench = benchmark_nlp.BenchmarkNLP(params)
-  else:
-    print("Run benchmarks for cnn model.")
-    bench = benchmark_cnn.BenchmarkCNN(params)
-  
-  bench.run()
