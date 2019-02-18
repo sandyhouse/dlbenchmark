@@ -60,8 +60,9 @@ def _validate_flags(params):
     print("Please specify one of the above models.")
     exit()
   
-  if not params.do_train and not params.do_eval:
-    print("At least one of `--do_train` or `--do_eval` should be specified.")
+  if not params.do_train and not params.do_eval and not params.do_predict:
+    print("At least one of `--do_train` or `--do_eval` or `--do_predict` "
+          "should be specified.")
     exit()
   
   if((params.num_epochs_per_decay or

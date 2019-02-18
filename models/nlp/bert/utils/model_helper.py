@@ -471,10 +471,22 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
               loss=total_loss,
               train_op=train_op)
     elif mode == tf.estimator.ModeKeys.EVAL:
+      def metric_fn(per_example_loss, label_ids, logits, is_real_example):
+        predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
+        accuracy = tf.metrics.accuracy(
+            labels=label_ids, predictions=predictions, weights=is_real_example)
+        loss = tf.metrics.mean(values=per_example_loss, weight=is_real_example)
+        return {
+               'eval_accuracy': accuracy,
+               'eval_loss': loss,
+            }
+      eval_metrics = (metric_fn, [per_example_loss, label_ids, logits, 
+                      is_real_example])
+
       output_spec = tf.estimator.EstimatorSpec(
               mode=mode,
               loss=total_loss,
-              eval_metric_ops=None)
+              eval_metrics=eval_metrics)
     else:
       output_spec = tf.estimator.EstimatorSpec(
               mode=mode,

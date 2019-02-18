@@ -59,6 +59,10 @@ def define_flags():
                       default=False,
                       action='store_true',
                       help="Whether to run evaluation.")
+  parser.add_argument("--do_predict",
+                      default=False,
+                      action='store_true',
+                      help="Whether to run prediction.")
   parser.add_argument("--data_format",
                       choices=['NHWC', 'NCHW'],
                       default="NCHW",

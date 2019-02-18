@@ -167,7 +167,7 @@ class BenchmarkNLP(object):
             config=run_config)
 
     if self.params.do_train:
-      train_file = os.path.join(self.params.data_dir, "train.tf_record")
+      train_file = os.path.join(self.params.model_dir, "train.tf_record")
       bert_helper.file_based_convert_examples_to_features(
             train_examples, label_list, self.params.max_seq_length, tokenizer,
             train_file)
@@ -181,7 +181,7 @@ class BenchmarkNLP(object):
               is_training=True,
               drop_remainder=True,
               batch_size=self.params.batch_size)
-      estimator.train(input_fn=train_input_fn, steps=num_train_steps)
+      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
     if self.params.do_eval:
       eval_examples = processor.get_dev_examples(self.params.data_dir)
@@ -189,7 +189,7 @@ class BenchmarkNLP(object):
 
       num_eval_steps = int(num_actual_eval_examples / self.params.batch_size)
 
-      eval_file = os.path.join(self.params.data_dir, "eval.tf_record")
+      eval_file = os.path.join(self.params.model_dir, "eval.tf_record")
       bert_helper.file_based_convert_examples_to_features(
               eval_examples, label_list, self.params.max_seq_length, tokenizer,
               eval_file)
@@ -221,7 +221,7 @@ class BenchmarkNLP(object):
       predict_examples = processor.get_test_examples(self.params.data_dir)
       num_actual_predict_examples = len(predict_examples)
 
-      predict_file = os.path.join(self.params.data_dir, "predict.tf_record")
+      predict_file = os.path.join(self.params.model_dir, "predict.tf_record")
       bert_helper.file_based_convert_examples_to_features(
               predict_examples, label_list, self.params.max_seq_length,
               tokenizer, predict_file)
