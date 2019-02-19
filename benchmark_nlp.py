@@ -10,6 +10,7 @@ import csv
 import os
 import json
 import six
+import numpy
 
 from models.nlp.bert.model import bert_model
 from models.nlp.bert.utils import optimization
@@ -28,6 +29,17 @@ PARAMS_MAP = {
         'base': model_params.BASE_PARAMS,
         'big': model_params.BIG_PARAMS,
 }
+
+class TimeHistory(tf.train.SessionRunHook):
+  """Record the run time for each iteration of training/evaluation."""
+  def begin(self):
+    self.times = []
+  
+  def before_run(self, run_context):
+    self.time_start = time.time()
+  
+  def after_run(self, run_context, run_values):
+    self.times.append(time.time() - self.time_start)
 
 DEFAULT_TRAIN_EPOCHS = 10
 
@@ -994,16 +1006,22 @@ class BenchmarkNLP(object):
     # Train and evaluate transformer model
     estimator = transformer_helper.construct_estimator(self.params, config, 
             schedule_manager)
+
+    time_hist = TimeHistory()
+
     transformer_helper.run_loop(
             estimator=estimator,
             # Training arguments
             schedule_manager=schedule_manager,
-            train_hooks=None,
+            train_hooks=time_hist,
             benchmark_logger=None,
             # BLEU calculation arguments
             bleu_source=self.params.bleu_source,
             bleu_ref=self.params.bleu_ref,
             vocab_file=self.params.vocab_file)
+
+    avg_time = np.mean(time_hist.times)
+    print("{} steps/sec.".format(1.0/avg_time))
     tf.logging.info("Completed transformer benchmark.")
   
   def run_bert_squad(self):
@@ -1105,7 +1123,14 @@ class BenchmarkNLP(object):
               is_training=True,
               drop_remainder=True,
               params=self.params)
-      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
+
+      time_hist = TimeHistory()
+
+      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps
+              hooks=[time_hist])
+
+      avg_time = np.mean(time_hist.times)
+      print("{} steps/sec (avg).").format(1.0/avg_time))
 
     if self.params.do_predict:
       eval_examples=read_squad_examples(
@@ -1257,7 +1282,13 @@ class BenchmarkNLP(object):
               is_training=True,
               drop_remainder=True,
               batch_size=self.params.batch_size)
+
+      time_hist = TimeHistory()
+
       estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
+
+      avg_time = np.mean(time_hist.times)
+      print("{} steps/sec (avg).".format(1.0/avg_time))
 
     if self.params.do_eval:
       eval_examples = processor.get_dev_examples(self.params.data_dir)
