@@ -300,8 +300,10 @@ class BenchmarkCNN(object):
       print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
 
-      max_time = np.argmax(time_hist.times)
-      min_time = np.argmin(time_hist.times)
+      max_time_index = np.argmax(time_hist.times)
+      min_time_index = np.argmin(time_hist.times)
+      max_time = time_hist.times[max_time_index]
+      min_time = time_hist.times[min_time_index]
       avg_time = np.mean(time_hist.times) # per batch
       print("{} images/second (avg).".format(self.batch_size/avg_time))
       print("{} images/second (max).".format(self.batch_size/max_time))

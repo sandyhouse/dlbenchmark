@@ -38,7 +38,7 @@ def define_flags():
                       default=32,
                       help="Batch size per computing device.")
   parser.add_argument("--num_epochs",
-                      type=int,
+                      type=float,
                       default=1,
                       help="Number of epochs to run.")
   parser.add_argument("--num_gpus",
@@ -172,24 +172,6 @@ def define_flags():
                            "layers, etc.), and various other settings. "
                            "The big parameter set increases the default batch "
                            "size, embedding/hidden size, and filter size.")
-  parser.add_argument("--num_parallel_calls",
-                      type=int,
-                      default=multiprocessing.cpu_count(),
-                      help="The number of records that are processed in "
-                           "parallel during input processing. This can be "
-                           "optimized per data set but for generally "
-                           "homogeneous data sets, should be approximately the "
-                           "number of available CPU cores.")
-  parser.add_argument("--use_synthetic_data",
-                      type=bool,
-                      default=False,
-                      help="If set, use fake data (zeros) instead of a real "
-                           "dataset.")
-  parser.add_argument("--static_batch",
-                      type=bool,
-                      default=False,
-                      help="Whether the batches in the dataset should have "
-                           "static.")
   parser.add_argument("--bleu_source",
                       type=str,
                       default=None,
@@ -211,6 +193,46 @@ def define_flags():
                      default=None,
                      help="The name of the task to train.")
   parser.add_argument("--do_lower_case",
-                     type=bool,
                      default=True,
+                     action='store_true',
                      help="Whether to use low case for input text.")
+  parser.add_argument("--train_file",
+                     type=str,
+                     default=None,
+                     help="SQuAD json for training. E.g., train-v1.1.json.")
+  parser.add_argument("--predict_file",
+                     type=str,
+                     default=None,
+                     help="SQuAD json for predictions. E.g., dev-v1.1.json.")
+  parser.add_argument("--doc_stride",
+                     type=int,
+                     default=128,
+                     help="When splitting up a long document into chunks, how "
+                          "much stride to taken between chunks.")
+  parser.add_argument("--max_query_length",
+                     type=int,
+                     default=64,
+                     help="The maximum number of tokens for the question. "
+                          "Questions longer than this will be truncated to "
+                          "this length.")
+  parser.add_argument("--n_best_size",
+                     type=int,
+                     default=20,
+                     help="The total number of n-best predictions to generate "
+                          "in the nbest_predictions.json output file.")
+  parser.add_argument("--max_answer_length",
+                     type=int,
+                     default=30,
+                     help="The maximum length of an answer that can be "
+                          "generated. This is needed because the start and end "
+                          "predictions are not conditioned on one another.")
+  parser.add_argument("--version_2_with_negative",
+                     default=False,
+                     action='store_true',
+                     help="If true, the SQuAD examples contain some that do "
+                          "not have an answer.")
+  parser.add_argument("--run_squad",
+                     default=False,
+                     action='store_true',
+                     help="If true, run SQuAD tasks, otherwise run sequence "
+                          "(sequence-pair) classification task.")
