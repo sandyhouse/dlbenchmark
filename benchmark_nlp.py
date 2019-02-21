@@ -10,7 +10,9 @@ import csv
 import os
 import json
 import six
-import numpy
+import numpy as np
+import time
+import math
 
 from models.nlp.bert.model import bert_model
 from models.nlp.bert.utils import optimization
@@ -600,7 +602,7 @@ RawResult = collections.namedtuple("RawResult",
 
 def write_predictions(all_examples, all_features, all_results, n_best_size,
                       max_answer_length, do_lower_case, output_prediction_file,
-                      output_nbest_file, output_null_log_odds_file):
+                      output_nbest_file, output_null_log_odds_file, params):
   """Write final predictions to the json file and log-odds of null if needed."""
   tf.logging.info("Writing predictions to: %s" % (output_prediction_file))
   tf.logging.info("Writing nbest to: %s" % (output_nbest_file))
@@ -635,7 +637,7 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
       start_indexes = _get_best_indexes(result.start_logits, n_best_size)
       end_indexes = _get_best_indexes(result.end_logits, n_best_size)
       # if we could have irrelevant answers, get the min score of irrelevant
-      if FLAGS.version_2_with_negative:
+      if params.version_2_with_negative:
         feature_null_score = result.start_logits[0] + result.end_logits[0]
         if feature_null_score < score_null:
           score_null = feature_null_score
@@ -1126,11 +1128,11 @@ class BenchmarkNLP(object):
 
       time_hist = TimeHistory()
 
-      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps
+      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps, 
               hooks=[time_hist])
 
       avg_time = np.mean(time_hist.times)
-      print("{} steps/sec (avg).").format(1.0/avg_time))
+      print("{} steps/sec (avg).".format(1.0/avg_time))
 
     if self.params.do_predict:
       eval_examples=read_squad_examples(
@@ -1150,7 +1152,7 @@ class BenchmarkNLP(object):
       convert_examples_to_features(
             examples=eval_examples,
             tokenizer=tokenizer,
-            max_seq_length=max_seq_length,
+            max_seq_length=self.params.max_seq_length,
             doc_stride=self.params.doc_stride,
             max_query_length=self.params.max_query_length,
             is_training=False,
@@ -1186,15 +1188,15 @@ class BenchmarkNLP(object):
 
       output_prediction_file = os.path.join(self.params.model_dir, 
               "predictions.json")
-      ouput_nbest_file = os.path.join(self.params.model_dir, 
+      output_nbest_file = os.path.join(self.params.model_dir, 
               "nbest_predictions.json")
-      ouput_null_log_odds_file = os.path.join(self.params.model_dir,
+      output_null_log_odds_file = os.path.join(self.params.model_dir,
               "null_odds.json")
 
-      write_predictions(eval_example, eval_feature, all_results,
+      write_predictions(eval_examples, eval_features, all_results,
               self.params.n_best_size, self.params.max_answer_length,
               self.params.do_lower_case, output_prediction_file,
-              output_nbest_file, output_null_log_odds_file)
+              output_nbest_file, output_null_log_odds_file, self.params)
 
 
 
@@ -1285,7 +1287,8 @@ class BenchmarkNLP(object):
 
       time_hist = TimeHistory()
 
-      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
+      estimator.train(input_fn=train_input_fn, max_steps=num_train_steps,
+		hooks=[time_hist])
 
       avg_time = np.mean(time_hist.times)
       print("{} steps/sec (avg).".format(1.0/avg_time))

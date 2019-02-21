@@ -26,9 +26,10 @@ parser = argparse.ArgumentParser(
 # Define commond line arguments for benchmarks
 def define_flags():
   parser.add_argument("--backend",
-                      choices=['TensorFlow', 'PyTorch'],
+                      choices=['TensorFlow', 'PyTorch', 
+                               'tensorflow', 'pytorch'],
                       default="TensorFlow",
-                      help="The backend used for benchmarks.")
+                      help="The backend framework used for benchmarks.")
   parser.add_argument("--model",
                       type=str,
                       default=None,
@@ -66,7 +67,7 @@ def define_flags():
   parser.add_argument("--data_format",
                       choices=['NHWC', 'NCHW'],
                       default="NCHW",
-                      help="Data format to use. Recommended: NHWC for CPUs, "
+                      help="Data format to use. Recommendation: NHWC for CPUs, "
                            "and NCHW for GPUs.")
   parser.add_argument("--optimizer",
                       choices=['momentum', 'sgd', 'adam'],
@@ -76,21 +77,6 @@ def define_flags():
                       type=float,
                       default=0.1,
                       help="Initial learning rate to use.")
-  parser.add_argument("--num_epochs_per_decay",
-                      type=int,
-                      default=0,
-                      help="Epochs after which learning rate decays.")
-  parser.add_argument("--learning_rate_decay_factor",
-                      type=float,
-                      default=0,
-                      help="Learning rate decay factor every "
-                           "`--num_epochs_per_decay` epochs.")
-  parser.add_argument("--minimum_learning_rate",
-                      type=float,
-                      default=0.0,
-                      help="Minimum learning rate. Requires "
-                           "`init_learning_rate`, `num_epochs_per_decay` and "
-                           "`learning_rate_decay_factor` to be specified.")
   parser.add_argument("--momentum",
                       type=float,
                       default=0.9,
@@ -145,7 +131,7 @@ def define_flags():
   parser.add_argument("--model_dir",
                       type=str,
                       default='/tmp',
-                      help="Path where model checkpoints will be stored.")
+                      help="Directory where model checkpoints will be stored.")
   parser.add_argument("--init_checkpoint",
                       type=str,
                       default=None,

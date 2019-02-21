@@ -21,10 +21,16 @@ from __future__ import print_function
 import os
 import json
 
-import tensorflow as tf
+try:
+  import tensorflow as tf
+except ImportError:
+  print("To run benchmarks for TensoFlow backend, TensorFlow should be "
+        "installed.")
+  print("Instructions for install TensorFlow are as follow:")
+  print("  - https://www.tensorflow.org/install")
+  raise
 
 import utils
-import flags
 import benchmark_cnn
 import benchmark_nlp
 
@@ -32,16 +38,15 @@ import benchmark_nlp
 NLP_MODELS = ['bert', 'transformer']
 
 def main(params):
-  """Run the benchmark."""
+  """Run benchmarks for TensorFlow."""
   
+  print("Run benchmarks for TensorFlow.")
   tf_version = utils.get_tensorflow_version()
   print('TensorFlow:  %i.%i' % (tf_version[0], tf_version[1]))
 
   if params.model in NLP_MODELS:
-    print("Run benchmarks for nlp model.")
     bench = benchmark_nlp.BenchmarkNLP(params)
   else:
-    print("Run benchmarks for cnn model.")
     bench = benchmark_cnn.BenchmarkCNN(params)
   
   bench.run()

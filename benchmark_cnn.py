@@ -1,3 +1,4 @@
+# --*-- coding:utf-8 --*--
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -29,6 +30,13 @@ from models.cnn import trivial_model as trivial
 import imagenet_datasets as datasets
 import utils
 
+MODEL_CREATOR = {
+        'alexnet': alexnet.AlexnetModel,
+        'resnet50': resnet.create_resnet50_model,
+        'googlenet': googlenet.GooglenetModel,
+        'vgg16': vgg.Vgg16Model,
+}
+
 class TimeHistory(tf.train.SessionRunHook):
   """Record the run time for each iteration of training/evaluation."""
   def begin(self):
@@ -55,48 +63,26 @@ def get_optimizer(params, learning_rate):
                      format(params.optimizer))
   return opt
 
-def get_learning_rate(params, global_step, num_examples_per_epoch, batch_size):
+def get_learning_rate(params, global_step):
   """Get a learning rate that decays step-wise."""
-  with tf.name_scope("learning_rate"):
-    num_batches_per_epoch = num_examples_per_epoch // batch_size
+  if params.init_learning_rate is not None:
+    learning_rate = tf.train.exponential_decay(
+              params.init_learning_rate,
+              global_step,
+              10000,
+              0.96,
+              staircase=True)
 
-    if params.init_learning_rate is not None:
-      learning_rate = params.init_learning_rate
-      if(params.num_epochs_per_decay > 0 and
-         params.learning_rate_decay_factor > 0):
-        decay_steps = num_batches_per_epoch * params.num_epochs_per_decay
-
-        learning_rate = tf.train.exponential_decay(
-                params.init_learning_rate,
-                global_step,
-                decay_steps,
-                params.learning_rate_decay_factor,
-                staircase=True)
-
-        if params.minimum_learning_rate != 0.:
-          learning_rate = tf.maximum(learning_rate,
-                                     params.minimum_learning_rate)
-          return learning_rate
-      else:
-        return learning_rate
-    else:
-      raise ValueError("`--init_learning_rate` must be specified.")
+    return learning_rate
+  else:
+    raise ValueError("`--init_learning_rate` must be specified.")
 
 def model_fn(features, labels, mode, params):
   """Define how to train, evaluate and predict."""
   tf.summary.image('images', features, max_outputs=6)
   with tf.variable_scope("model"):
     # Create model and get output logits.
-    if params.model == "alexnet":
-      model = alexnet.AlexnetModel(params)
-    elif params.model == "resnet50":
-      model = resnet.create_resnet50_model(params)
-    elif params.model == "googlenet":
-      model = googlenet.GooglenetModel(params)
-    elif params.model == "vgg16":
-      model = vgg.Vgg16Model(params)
-    else:
-      raise ValueError("model `{}` not supported.".format(params.model))
+    model = MODEL_CREATOR[params.model](params)
 
     logits = model.build_network(features, mode==tf.estimator.ModeKeys.TRAIN)
     logits = tf.cast(logits, tf.float32)
@@ -129,25 +115,18 @@ def model_fn(features, labels, mode, params):
       train_op = None
 
     elif mode == tf.estimator.ModeKeys.TRAIN:
-      # FIXME: fix the params.batch_size based on num_gpus
-      num_examples_per_epoch = datasets.NUM_IMAGES['train'] // params.batch_size
       global_step = tf.train.get_or_create_global_step()
-      learning_rate = get_learning_rate(
-              params,
-              global_step,
-              num_examples_per_epoch,
-              params.batch_size)
+      learning_rate = get_learning_rate(params, global_step)
 
       tf.identity(learning_rate, name='learning_rate')
       tf.summary.scalar('learning_rate', learning_rate)
 
       optimizer = get_optimizer(params, learning_rate)
 
-      #minimize_op = optimizer.minimize(loss, global_step=global_step)
       train_op = optimizer.minimize(loss, global_step=global_step)
 
-      #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-      #train_op = tf.group(minimize_op, update_ops)
+      update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      train_op = tf.group(minimize_op, update_ops)
 
     accuracy = tf.metrics.accuracy(labels, predictions['classes'])
     accuracy_top_5 = tf.metrics.mean(
@@ -182,7 +161,6 @@ class BenchmarkCNN(object):
     tf.logging.set_verbosity(tf.logging.INFO)
     self.params = params
 
-    self.model = self.params.model
     self.batch_size_per_device = self.params.batch_size
     self.batch_size = self.params.batch_size
 
@@ -269,10 +247,10 @@ class BenchmarkCNN(object):
         config=run_config,
         params=self.params)
 
-    if not self.use_synthetic_data:
-      input_function = datasets.input_fn
-    else:
+    if self.use_synthetic_data:
       input_function = datasets.get_synth_input_fn(self.data_type)
+    else:
+      input_function = datasets.input_fn
 
     def input_fn_train(num_epochs):
       return input_function(
@@ -294,19 +272,21 @@ class BenchmarkCNN(object):
     time_hist = TimeHistory()
 
     if self.do_train:
-      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
+      classifier.train(input_fn=input_fn_train(self.num_epochs), 
                        hooks=[time_hist])
       total_time = sum(time_hist.times)
       print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
 
-      max_time_index = np.argmax(time_hist.times)
-      min_time_index = np.argmin(time_hist.times)
-      max_time = time_hist.times[max_time_index]
-      min_time = time_hist.times[min_time_index]
+      #max_time_index = np.argmax(time_hist.times)
+      #min_time_index = np.argmin(time_hist.times)
+      #max_time = time_hist.times[max_time_index]
+      #min_time = time_hist.times[min_time_index]
       avg_time = np.mean(time_hist.times) # per batch
       print("{} images/second (avg).".format(self.batch_size/avg_time))
-      print("{} images/second (max).".format(self.batch_size/max_time))
-      print("{} images/second (min).".format(self.batch_size/min_time))
+      #print("{} images/second (max).".format(self.batch_size/max_time))
+      #print("{} images/second (min).".format(self.batch_size/min_time))
     else:
-      classifier.evaluate(input_fn=lambda: input_fn_train(self.num_epochs))
+      results = classifier.evaluate(input_fn=input_fn_train(self.num_epochs))
+      print("accuracy: {}, accuracy_top_5: {}".format(
+          results['accuracy'], results['accuracy_top_5'])

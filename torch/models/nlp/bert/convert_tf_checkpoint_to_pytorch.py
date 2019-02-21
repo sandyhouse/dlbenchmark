@@ -21,9 +21,9 @@ from __future__ import print_function
 import argparse
 import torch
 
-from .bert_model import BertConfig
-from .bert_model import BertForPreTraining
-from .bert_model import load_tf_weights_in_bert
+from bert_model import BertConfig
+from bert_model import BertForPreTraining
+from bert_model import load_tf_weights_in_bert
 
 def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, 
         pytorch_dump_path):

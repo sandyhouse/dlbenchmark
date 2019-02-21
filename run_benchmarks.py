@@ -12,7 +12,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Benchmark script for TensorFlow."""
+"""Benchmark scripts for TensorFlow and PyTorch."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,11 +21,7 @@ from __future__ import print_function
 import os
 import json
 
-import tensorflow as tf
-
 import flags
-import tf_benchmarks
-import torch.torch_benchmarks
 
 # All supported models to benchmark.
 ALL_MODELS = ['alexnet',
@@ -46,43 +42,31 @@ params = flags.parser.parse_args()
 def _validate_flags(params):
   """Check if command line arguments are valid."""
   if params.model is None:
-    print("The model to benchmark is not specified, using `--model` "
-          "to specify a model to benchmark.")
+    print("The model to benchmark is not specified.\n"
+          "Using `--model` to specify a model to benchmark.")
+    print("All supported models are as following:")
+    print("=" * 30)
+    for model in ALL_MODELS:
+      print("    -%s" % model)
+    print("=" * 30)
+    print("Please specify one of the above models.")
     exit()
 
   if not params.model in ALL_MODELS:
     print("The model `%s` is not implemented in our benchmarks." % params.model)
-    print("All supported models to benchmark:")
+    print("All supported models are as following:")
     print("=" * 30)
     for model in ALL_MODELS:
-      print("*** {}".format(model))
+      print("    -%s" % model)
     print("=" * 30)
     print("Please specify one of the above models.")
     exit()
   
-  if not params.do_train and not params.do_eval and not params.do_predict:
-    print("At least one of `--do_train` or `--do_eval` or `--do_predict` "
+  if not (params.do_train or params.do_eval or params.do_predict):
+    print("At least one of `--do_train`, `--do_eval` or `--do_predict` "
           "should be specified.")
     exit()
   
-  if((params.num_epochs_per_decay or
-      params.learning_rate_decay_factor) and
-      not (params.init_learning_rate is not None and
-           params.num_epochs_per_decay and 
-           params.learning_rate_decay_factor)):
-    print("If one of `--num_epochs_per_decay` or `-learning_rate_decay_factor` "
-          "is set, both must be set and `--init_learning_rate` must be set.")
-    exit()
-
-  if (params.minimum_learning_rate and
-      not (params.init_learning_rate is not None and
-           params.num_epochs_per_decay and 
-           params.learning_rate_decay_factor)):
-    print("`--minimum_learning_rate` requires `--init_learning_rate`"
-          ", `--num_epochs_per_decay`, and `--learning_rate_decay_factor` "
-          "to be set.")
-    exit()
-
   if params.fp16_vars and not params.use_fp16:
     print('If `--fp16_vars` is specified, set `--use_fp16` to True at the same '
           'time.')
@@ -96,7 +80,7 @@ def _validate_flags(params):
 
   if (params.num_gpus == 0 and params.data_format != 'NHWC') or (
       params.num_gpus and params.data_format != 'NCHW'):
-    print("Recommend: 'NHWC' for CPU and 'NCHW' for GPU")
+    print("Required: 'NHWC' for CPU and 'NCHW' for GPU")
     exit()
 
   if params.ip_list:
@@ -131,9 +115,11 @@ def main(params):
 
     os.environ["TF_CONFIG"] = json.dumps(TF_CONFIG)
 
-  if params.backend == 'TensorFlow':
+  if params.backend in ['TensorFlow', 'tensorflow']:
+    import tf_benchmarks
     tf_benchmarks.main(params)
   else:
+    import torch.torch_benchmarks as torch_benchmarks
     torch_benchmarks.main(params)
 
 if __name__ == '__main__':
