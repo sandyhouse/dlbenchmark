@@ -26,7 +26,7 @@ import imagenet_preprocessing
 
 DEFAULT_IMAGE_SIZE = 224
 NUM_CHANNELS = 3
-NUM_CLASSES = 1001
+NUM_CLASSES = 1000
 
 NUM_IMAGES = {
     'train': 1281167,
@@ -96,30 +96,31 @@ def _parse_example_proto(example_serialized):
   }
   sparse_float32 = tf.io.VarLenFeature(dtype=tf.float32)
   # Sparse features in Example proto.
-  feature_map.update(
-      {k: sparse_float32 for k in ['image/object/bbox/xmin',
-                                   'image/object/bbox/ymin',
-                                   'image/object/bbox/xmax',
-                                   'image/object/bbox/ymax']})
+  #feature_map.update(
+  #    {k: sparse_float32 for k in ['image/object/bbox/xmin',
+  #                                 'image/object/bbox/ymin',
+  #                                 'image/object/bbox/xmax',
+  #                                 'image/object/bbox/ymax']})
 
   features = tf.io.parse_single_example(serialized=example_serialized,
                                         features=feature_map)
   label = tf.cast(features['image/class/label'], dtype=tf.int32)
 
-  xmin = tf.expand_dims(features['image/object/bbox/xmin'].values, 0)
-  ymin = tf.expand_dims(features['image/object/bbox/ymin'].values, 0)
-  xmax = tf.expand_dims(features['image/object/bbox/xmax'].values, 0)
-  ymax = tf.expand_dims(features['image/object/bbox/ymax'].values, 0)
+  #xmin = tf.expand_dims(features['image/object/bbox/xmin'].values, 0)
+  #ymin = tf.expand_dims(features['image/object/bbox/ymin'].values, 0)
+  #xmax = tf.expand_dims(features['image/object/bbox/xmax'].values, 0)
+  #ymax = tf.expand_dims(features['image/object/bbox/ymax'].values, 0)
 
-  # Note that we impose an ordering of (y, x) just to make life difficult.
-  bbox = tf.concat([ymin, xmin, ymax, xmax], 0)
+  ## Note that we impose an ordering of (y, x) just to make life difficult.
+  #bbox = tf.concat([ymin, xmin, ymax, xmax], 0)
 
-  # Force the variable number of bounding boxes into the shape
-  # [1, num_boxes, coords].
-  bbox = tf.expand_dims(bbox, 0)
-  bbox = tf.transpose(a=bbox, perm=[0, 2, 1])
+  ## Force the variable number of bounding boxes into the shape
+  ## [1, num_boxes, coords].
+  #bbox = tf.expand_dims(bbox, 0)
+  #bbox = tf.transpose(a=bbox, perm=[0, 2, 1])
 
-  return features['image/encoded'], label, bbox
+  #return features['image/encoded'], label, bbox
+  return features['image/encoded'], label
 
 
 def parse_record(raw_record, is_training, dtype):
@@ -137,11 +138,12 @@ def parse_record(raw_record, is_training, dtype):
   Returns:
     Tuple with processed image tensor and one-hot-encoded label tensor.
   """
-  image_buffer, label, bbox = _parse_example_proto(raw_record)
+  #image_buffer, label, bbox = _parse_example_proto(raw_record)
+  image_buffer, label = _parse_example_proto(raw_record)
 
   image = imagenet_preprocessing.preprocess_image(
       image_buffer=image_buffer,
-      bbox=bbox,
+      bbox=None,
       output_height=DEFAULT_IMAGE_SIZE,
       output_width=DEFAULT_IMAGE_SIZE,
       num_channels=NUM_CHANNELS,
@@ -230,9 +232,9 @@ def get_synth_input_fn(dtype):
 
     num_images = num_images * kwargs['num_epochs']
 
-    repeated_num = (num_images + batch_size - 1) // batch_size
+    #repeated_num = (num_images + batch_size - 1) // batch_size
 
-    data = tf.data.Dataset.from_tensors((inputs, labels)).repeat(repeated_num)
+    data = tf.data.Dataset.from_tensors((inputs, labels)).repeat(8000)
     data = data.prefetch(buffer_size=tf.contrib.data.AUTOTUNE)
 
     return data

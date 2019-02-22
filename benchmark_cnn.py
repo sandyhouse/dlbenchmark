@@ -102,15 +102,13 @@ def model_fn(features, labels, mode, params):
                   'predict': tf.estimator.export.PredictOutput(predictions)
               })
 
-    # Calculate loss, including softmax cross entropy and L2 regularization.
-    cross_entropy = tf.losses.sparse_softmax_cross_entropy(
+    # Calculate loss: softmax cross entropy.
+    loss = tf.losses.sparse_softmax_cross_entropy(
             logits=logits, labels=labels)
 
-    tf.identity(cross_entropy, name='cross_entropy')
-    tf.summary.scalar('cross_entropy', cross_entropy)
+    tf.identity(loss, name='loss')
+    tf.summary.scalar('loss', loss)
 
-    loss = cross_entropy
-    
     if mode == tf.estimator.ModeKeys.EVAL:
       train_op = None
 
@@ -125,8 +123,8 @@ def model_fn(features, labels, mode, params):
 
       train_op = optimizer.minimize(loss, global_step=global_step)
 
-      update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-      train_op = tf.group(minimize_op, update_ops)
+      #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      #train_op = tf.group(train_op, update_ops)
 
     accuracy = tf.metrics.accuracy(labels, predictions['classes'])
     accuracy_top_5 = tf.metrics.mean(
@@ -178,9 +176,6 @@ class BenchmarkCNN(object):
 
     self.optimizer = self.params.optimizer
     self.init_learning_rate = self.params.init_learning_rate
-    self.num_epochs_per_decay = self.params.num_epochs_per_decay
-    self.learning_rate_decay_factor = self.params.learning_rate_decay_factor
-    self.minimum_learning_rate = self.params.minimum_learning_rate
     self.momentum = self.params.momentum
     self.adam_beta1 = self.params.adam_beta1
     self.adam_beta2 = self.params.adam_beta2
@@ -211,7 +206,7 @@ class BenchmarkCNN(object):
       mode += 'eval '
 
     print()
-    print('Model:       %s' % self.model)
+    print('Model:       %s' % self.params.model)
     print('Dataset:     %s' % dataset_name)
     print('Mode:        %s' % mode)
     print('Batch size:  %s global (per machine)' % (
@@ -272,7 +267,7 @@ class BenchmarkCNN(object):
     time_hist = TimeHistory()
 
     if self.do_train:
-      classifier.train(input_fn=input_fn_train(self.num_epochs), 
+      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
                        hooks=[time_hist])
       total_time = sum(time_hist.times)
       print("Totoal time with {} GPU(s): {} seconds.".format(
@@ -287,6 +282,6 @@ class BenchmarkCNN(object):
       #print("{} images/second (max).".format(self.batch_size/max_time))
       #print("{} images/second (min).".format(self.batch_size/min_time))
     else:
-      results = classifier.evaluate(input_fn=input_fn_train(self.num_epochs))
+      results = classifier.evaluate(input_fn=lambda: input_fn_eval())
       print("accuracy: {}, accuracy_top_5: {}".format(
-          results['accuracy'], results['accuracy_top_5'])
+          results['accuracy'], results['accuracy_top_5']))

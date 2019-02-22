@@ -28,7 +28,7 @@ class Model(object):
                img_height,
                batch_size,
                learning_rate,
-               nclass=1001,
+               nclass=1000,
                params=None):
     """
     Args:
