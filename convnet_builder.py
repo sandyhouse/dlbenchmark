@@ -18,15 +18,9 @@ from __future__ import division
 from __future__ import print_function
 
 from collections import defaultdict
-
 import numpy as np
 
 import tensorflow as tf
-
-from tensorflow.python.layers import convolutional as conv_layers
-from tensorflow.python.layers import core as core_layers
-from tensorflow.python.layers import pooling as pooling_layers
-from tensorflow.python.training import moving_averages
 
 class ConvNetBuilder(object):
   """Builder of convolutional neural networks."""
@@ -95,7 +89,7 @@ class ConvNetBuilder(object):
     return tf.cast(var, cast_dtype)
 
   def conv(self,
-           num_out_channels,
+           filters,
            k_height,
            k_width,
            d_height=1,
@@ -121,7 +115,7 @@ class ConvNetBuilder(object):
       if self.data_format == 'NCHW':
         strides = [strides[0], strides[3], strides[1], strides[2]]
       if mode != 'SAME_RESNET':
-        conv = conv_layers.conv2d(input_layer, num_out_channels,
+        conv = tf.layers.conv2d(input_layer, filters,
                                   kernel_size=[k_height, k_width],
                                   strides=[d_height, d_width], padding=mode,
                                   data_format = self.channel_pos,
@@ -129,7 +123,7 @@ class ConvNetBuilder(object):
                                   use_bias=False)
       else:  # Special padding mode for ResNet models
         if d_height == 1 and d_width == 1:
-          conv = conv_layers.conv2d(input_layer, num_out_channels,
+          conv = tf.layers.conv2d(input_layer, filters,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width], padding='SAME',
                                     data_format = self.channel_pos,
@@ -145,7 +139,7 @@ class ConvNetBuilder(object):
           if self.data_format == 'NCHW':
             padding = [padding[0], padding[3], padding[1], padding[2]]
           padded_input_layer = tf.pad(input_layer, padding)
-          conv = conv_layers.conv2d(padded_input_layer, num_out_channels,
+          conv = tf.layers.conv2d(padded_input_layer, filters,
                                     kernel_size=[k_height, k_width],
                                     strides=[d_height, d_width],
                                     padding='VALID',
@@ -156,7 +150,7 @@ class ConvNetBuilder(object):
         use_batch_norm = self.use_batch_norm
       if not use_batch_norm:
         if bias is not None:
-          biases = self.get_variable('biases', [num_out_channels],
+          biases = self.get_variable('biases', [filters],
                                      self.variable_dtype, self.dtype,
                                      initializer=tf.constant_initializer(bias))
           biased = tf.reshape(
@@ -166,7 +160,7 @@ class ConvNetBuilder(object):
           biased = conv
       else:
         self.top_layer = conv
-        self.top_size = num_out_channels
+        self.top_size = filters
         biased = self.batch_norm(**self.batch_norm_config)
       if activation == 'relu':
         conv1 = tf.nn.relu(biased)
@@ -177,7 +171,7 @@ class ConvNetBuilder(object):
       else:
         raise KeyError('Invalid activation type \'%s\'' % activation)
       self.top_layer = conv1
-      self.top_size = num_out_channels
+      self.top_size = filters
       return conv1
 
   def _pool(self,
@@ -214,7 +208,7 @@ class ConvNetBuilder(object):
             input_layer=None,
             num_channels_in=None):
     """Construct a max pooling layer."""
-    return self._pool('mpool', pooling_layers.max_pooling2d, k_height, k_width,
+    return self._pool('mpool', tf.layers.max_pooling2d, k_height, k_width,
                       d_height, d_width, mode, input_layer, num_channels_in)
 
   def apool(self,
@@ -226,7 +220,7 @@ class ConvNetBuilder(object):
             input_layer=None,
             num_channels_in=None):
     """Construct an average pooling layer."""
-    return self._pool('apool', pooling_layers.average_pooling2d, k_height,
+    return self._pool('apool', tf.layers.average_pooling2d, k_height,
                       k_width, d_height, d_width, mode, input_layer,
                       num_channels_in)
 
@@ -324,13 +318,13 @@ class ConvNetBuilder(object):
     with tf.variable_scope(name):
       if not self.phase_train:
         keep_prob = 1.0
-      dropout = core_layers.dropout(input_layer, 1. - keep_prob,
+      dropout = tf.layers.dropout(input_layer, 1. - keep_prob,
                                     training=self.phase_train)
       self.top_layer = dropout
       return dropout
 
   def batch_norm(self, input_layer=None, decay=0.999, scale=False,
-                 epsilon=0.001):
+                 epsilon=0.001, center=True):
     """Adds a Batch Normalization layer."""
     if input_layer is None:
       input_layer = self.top_layer
@@ -339,7 +333,6 @@ class ConvNetBuilder(object):
     name = 'batchnorm' + str(self.counts['batchnorm'])
     self.counts['batchnorm'] += 1
 
-    center = True
     with tf.variable_scope(name) as scope:
       bn = tf.contrib.layers.batch_norm(
           input_layer,
@@ -347,7 +340,6 @@ class ConvNetBuilder(object):
           scale=scale,
           epsilon=epsilon,
           is_training=self.phase_train,
-          fused=True,
           data_format=self.data_format,
           scope=scope,
           center=center)
@@ -356,7 +348,7 @@ class ConvNetBuilder(object):
     self.top_size = int(self.top_size)
     return bn
 
-  def lrn(self, depth_radius=0.5, bias=1, alpha=1, beta=0.5):
+  def lrn(self, depth_radius=5, bias=1, alpha=1, beta=0.5):
     """Adds a local response normalization layer."""
     name = 'lrn' + str(self.counts['lrn'])
     self.counts['lrn'] += 1

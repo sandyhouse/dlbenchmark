@@ -24,70 +24,167 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import math
+
 import tensorflow as tf
 from models.cnn import model
 
+default_config = {
+    'image_size': 224,
+    'num_classes': 1000
+    }
 
 class AlexnetModel(model.Model):
-  """Original Alexnet cnn model."""
+  """Alexnet model for ImageNet."""
 
   def __init__(self, params=None):
     super(AlexnetModel, self).__init__(
-        224, 512, 0.005, params=params)
+            default_config['image_size'],
+            default_config['num_classes'],
+            params=params)
 
-  def add_inference(self, cnn):
-    # Note: VALID requires padding the images by 3 in width and height
-    cnn.conv(64, 11, 11, 4, 4, 'VALID')
-    cnn.mpool(3, 3, 2, 2)
-    cnn.conv(192, 5, 5)
-    cnn.mpool(3, 3, 2, 2)
-    cnn.conv(384, 3, 3)
-    cnn.conv(384, 3, 3)
-    cnn.conv(256, 3, 3)
-    cnn.mpool(3, 3, 2, 2)
-    cnn.reshape([-1, 256 * 6 * 6])
-    cnn.affine(4096)
-    cnn.dropout()
-    cnn.affine(4096)
-    cnn.dropout()
+  def build_network(self, inputs, is_training):
+    """Builds the forward pass of the model.
 
+    Args:
+      inputs: the list of inputs, excluding labels
+      is_training: if in the phrase of training.
 
-class AlexnetCifar10Model(model.Model):
-  """Alexnet cnn model for cifar datasets.
+    Returns:
+      The logits of the model.
+    """
+    inputs = tf.image.resize_image_with_crop_or_pad(inputs, 227, 227)
+    if self.data_format == 'NCHW':
+      inputs = tf.transpose(inputs, [0, 3, 1, 2])
 
-  The model architecture follows the one defined in the tensorflow tutorial
-  model.
+    stdv = 1.0 / math.sqrt(inputs.shape.as_list()[1] * 11 * 11)
+    conv1 = tf.layers.conv2d(
+            inputs=inputs, 
+            filters=64,
+            kernel_size=11,
+            strides=4,
+            padding='valid',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    pool1 = tf.layers.max_pooling2d(
+            inputs=conv1,
+            pool_size=3,
+            strides=2,
+            padding='valid',
+            data_format=self.channel_pos
+            )
 
-  Reference model: tensorflow/models/tutorials/image/cifar10/cifar10.py
-  Paper: http://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf
-  """
+    stdv = 1.0 / math.sqrt(pool1.shape.as_list()[1] * 5 * 5)
+    conv2 = tf.layers.conv2d(
+            inputs=pool1, 
+            filters=192,
+            kernel_size=5,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    pool2 = tf.layers.max_pooling2d(
+            inputs=conv2,
+            pool_size=3,
+            strides=2,
+            padding='valid',
+            data_format=self.channel_pos
+            )
 
-  def __init__(self, params=None):
-    super(AlexnetCifar10Model, self).__init__(
-        32, 128, 0.1, nclass=10, params=params)
+    stdv = 1.0 / math.sqrt(pool2.shape.as_list()[1] * 3 * 3)
+    conv3 = tf.layers.conv2d(
+            inputs=pool2, 
+            filters=384,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
 
-  def add_inference(self, cnn):
-    cnn.conv(64, 5, 5, 1, 1, 'SAME', stddev=5e-2)
-    cnn.mpool(3, 3, 2, 2, mode='SAME')
-    cnn.lrn(depth_radius=4, bias=1.0, alpha=0.001 / 9.0, beta=0.75)
-    cnn.conv(64, 5, 5, 1, 1, 'SAME', bias=0.1, stddev=5e-2)
-    cnn.lrn(depth_radius=4, bias=1.0, alpha=0.001 / 9.0, beta=0.75)
-    cnn.mpool(3, 3, 2, 2, mode='SAME')
-    shape = cnn.top_layer.get_shape().as_list()
-    flat_dim = shape[1] * shape[2] * shape[3]
-    cnn.reshape([-1, flat_dim])
-    cnn.affine(384, stddev=0.04, bias=0.1)
-    cnn.affine(192, stddev=0.04, bias=0.1)
+    stdv = 1.0 / math.sqrt(conv3.shape.as_list()[1] * 3 * 3)
+    conv4 = tf.layers.conv2d(
+            inputs=conv3, 
+            filters=384,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
 
-  def get_learning_rate(self, global_step, batch_size):
-    num_examples_per_epoch = 50000
-    num_epochs_per_decay = 100
-    decay_steps = (
-        num_epochs_per_decay * num_examples_per_epoch // batch_size)
-    decay_factor = 0.1
-    return tf.train.exponential_decay(
-        self.learning_rate,
-        global_step,
-        decay_steps,
-        decay_factor,
-        staircase=True)
+    stdv = 1.0 / math.sqrt(conv4.shape.as_list()[1] * 3 * 3)
+    conv5 = tf.layers.conv2d(
+            inputs=conv4, 
+            filters=256,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    pool5 = tf.layers.max_pooling2d(
+            inputs=conv5,
+            pool_size=3,
+            strides=2,
+            padding='valid',
+            data_format=self.channel_pos
+            )
+
+    drop6 = tf.layers.dropout(
+            inputs=pool5,
+            rate=0.5,
+            training=is_training
+            )
+
+    stdv = 1.0 / math.sqrt(drop6.shape.as_list()[1] * drop6.shape.as_list()[2] *
+                           drop6.shape.as_list()[3] * 1.0)
+    drop6 = tf.layers.flatten(
+            inputs=drop6
+            )
+
+    fc6 = tf.contrib.layers.fully_connected(
+            inputs=drop6,
+            num_outputs=4096,
+            activation_fn=tf.nn.relu,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    drop7 = tf.layers.dropout(
+            inputs=fc6,
+            rate=0.5,
+            training=is_training
+            )
+
+    stdv = 1.0 / math.sqrt(drop7.shape.as_list()[1] * 1.0)
+    fc7 = tf.contrib.layers.fully_connected(
+            inputs=drop7,
+            num_outputs=4096,
+            activation_fn=tf.nn.relu,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    stdv = 1.0 / math.sqrt(fc7.shape.as_list()[1] * 1.0)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=fc7,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    return logits

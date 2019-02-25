@@ -97,12 +97,6 @@ def define_flags():
                       default=False,
                       action='store_true',
                       help="Whether to use float16 for tensors.")
-  parser.add_argument("--fp16_vars",
-                      default=False,
-                      action='store_true',
-                      help="Whether to use fp16 for variables. If False, "
-                           "variables are stored in fp32 and casted to fp16 "
-                           "when used. Recommended: False.")
   parser.add_argument("--all_reduce_spec",
                       type=str,
                       default=None,

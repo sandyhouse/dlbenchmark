@@ -67,17 +67,6 @@ def _validate_flags(params):
           "should be specified.")
     exit()
   
-  if params.fp16_vars and not params.use_fp16:
-    print('If `--fp16_vars` is specified, set `--use_fp16` to True at the same '
-          'time.')
-    exit()
-
-  if (params.use_fp16 and params.fp16_vars and
-      params.all_reduce_spec and 'nccl' in params.all_reduce_spec):
-    print('fp16 variables are not supported with NCCL.')
-    exit()
-  
-
   if (params.num_gpus == 0 and params.data_format != 'NHWC') or (
       params.num_gpus and params.data_format != 'NCHW'):
     print("Required: 'NHWC' for CPU and 'NCHW' for GPU")

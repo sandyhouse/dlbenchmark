@@ -181,17 +181,18 @@ class BenchmarkCNN(object):
     self.adam_beta2 = self.params.adam_beta2
     self.adam_epsilon = self.params.adam_epsilon
     self.use_fp16 = self.params.use_fp16
-    self.fp16_vars = self.params.fp16_vars
+    #self.fp16_vars = self.params.fp16_vars
     self.all_reduce_spec = self.params.all_reduce_spec
     self.save_checkpoints_steps = self.params.save_checkpoints_steps
     self.max_chkpts_to_keep = self.params.max_chkpts_to_keep
     self.model_dir = self.params.model_dir
     self.data_format = self.params.data_format
 
-    if self.use_fp16 and self.fp16_vars:
-      self.data_type = tf.float16
-    else:
-      self.data_type = tf.float32
+    #if self.use_fp16 and self.fp16_vars:
+    #  self.data_type = tf.float16
+    #else:
+    #  self.data_type = tf.float32
+    self.data_type = tf.float16 if self.params.use_fp16 else tf.float32
 
     self.print_info()
     
