@@ -1,5 +1,4 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
+# -*- coding:utf-8 -*-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -28,56 +27,232 @@ from __future__ import division
 from __future__ import print_function
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
+import numpy as np
 from models.cnn import model
 
+import tensorflow as tf
 
-def _construct_vgg(cnn, num_conv_layers):
+
+default_config = {
+    'image_size': 224,
+    'num_classes': 1000
+    }
+
+def _construct_vgg(inputs, num_conv_layers, channel_pos, is_training):
   """Build vgg architecture from blocks."""
   assert len(num_conv_layers) == 5
+  output = inputs
   for _ in xrange(num_conv_layers[0]):
-    cnn.conv(64, 3, 3)
-  cnn.mpool(2, 2)
+    output = tf.layers.conv2d(
+            inputs=output,
+            filters=64,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=tf.nn.relu,
+            data_format=channel_pos,
+            kernel_initializer=tf.variance_scaling_initializer(),
+            bias_initializer=tf.constant_initializer(0.0)
+            )
+  output = tf.layers.max_pooling2d(
+          inputs=output,
+          pool_size=2,
+          strides=2,
+          padding='valid',
+          data_format=channel_pos
+          )
   for _ in xrange(num_conv_layers[1]):
-    cnn.conv(128, 3, 3)
-  cnn.mpool(2, 2)
+    output = tf.layers.conv2d(
+            inputs=output,
+            filters=128,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=tf.nn.relu,
+            data_format=channel_pos,
+            kernel_initializer=tf.variance_scaling_initializer(),
+            bias_initializer=tf.constant_initializer(0.0)
+            )   
+  output = tf.layers.max_pooling2d(
+          inputs=output,
+          pool_size=2,
+          strides=2,
+          padding='valid',
+          data_format=channel_pos
+          )
   for _ in xrange(num_conv_layers[2]):
-    cnn.conv(256, 3, 3)
-  cnn.mpool(2, 2)
+    output = tf.layers.conv2d(
+            inputs=output,
+            filters=256,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=tf.nn.relu,
+            data_format=channel_pos,
+            kernel_initializer=tf.variance_scaling_initializer(),
+            bias_initializer=tf.constant_initializer(0.0)
+            )
+  output = tf.layers.max_pooling2d(
+          inputs=output,
+          pool_size=2,
+          strides=2,
+          padding='valid',
+          data_format=channel_pos
+          )
   for _ in xrange(num_conv_layers[3]):
-    cnn.conv(512, 3, 3)
-  cnn.mpool(2, 2)
+    output = tf.layers.conv2d(
+            inputs=output,
+            filters=512,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=tf.nn.relu,
+            data_format=channel_pos,
+            kernel_initializer=tf.variance_scaling_initializer(),
+            bias_initializer=tf.constant_initializer(0.0)
+            )
+  output = tf.layers.max_pooling2d(
+          inputs=output,
+          pool_size=2,
+          strides=2,
+          padding='valid',
+          data_format=channel_pos
+          )
   for _ in xrange(num_conv_layers[4]):
-    cnn.conv(512, 3, 3)
-  cnn.mpool(2, 2)
-  cnn.reshape([-1, 512 * 7 * 7])
-  cnn.affine(4096)
-  cnn.dropout()
-  cnn.affine(4096)
-  cnn.dropout()
+    output = tf.layers.conv2d(
+            inputs=output,
+            filters=512,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=tf.nn.relu,
+            data_format=channel_pos,
+            kernel_initializer=tf.variance_scaling_initializer(),
+            bias_initializer=tf.constant_initializer(0.0)
+            )
+  output = tf.layers.max_pooling2d(
+          inputs=output,
+          pool_size=2,
+          strides=2,
+          padding='valid',
+          data_format=channel_pos
+          )
+  output = tf.reshape(output, [-1, 512 * 7 * 7])
+  stddev = np.sqrt(1.0 / 4096)
+  fc1 = tf.contrib.layers.fully_connected(
+          inputs=output,
+          num_outputs=4096,
+          activation_fn=tf.nn.relu,
+          weights_initializer=tf.truncated_normal_initializer(stddev),
+          biases_initializer=tf.constant_initializer(0.0)
+          )
+  drop1 = tf.layers.dropout(
+          inputs=fc1,
+          rate=0.5,
+          training=is_training
+          )
 
+  fc2 = tf.contrib.layers.fully_connected(
+          inputs=drop1,
+          num_outputs=4096,
+          activation_fn=tf.nn.relu,
+          weights_initializer=tf.truncated_normal_initializer(stddev),
+          biases_initializer=tf.constant_initializer(0.0)
+          )
+  drop2 = tf.layers.dropout(
+          inputs=fc2,
+          rate=0.5,
+          training=is_training
+          )
+
+  return drop2
 
 class Vgg11Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg11Model, self).__init__(224, 64, 0.005, params=params)
+    super(Vgg11Model, self).__init__(
+            default_config['image_size'],
+            default_config['num_classes'],
+            params=params)
 
-  def add_inference(self, cnn):
-    _construct_vgg(cnn, [1, 1, 2, 2, 2])
+  def build_network(self, inputs, is_training):
+    """Builds the forward pass of the model.
 
+    Args:
+      inputs: the list of inputs, excluding labels
+      is_training: if in the phrase of training.
+
+    Returns:
+      The logits of the model.
+    """
+    output = _construct_vgg(inputs, [1, 1, 2, 2, 2], self.channel_pos, 
+            is_training)
+    stdv = np.sqrt(1.0 / self.num_classes)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=output,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    return logits
 
 class Vgg16Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg16Model, self).__init__(224, 64, 0.005, params=params)
+    super(Vgg16Model, self).__init__(
+            default_config['image_size'],
+            default_config['num_classes'],
+            params=params)
 
-  def add_inference(self, cnn):
-    _construct_vgg(cnn, [2, 2, 3, 3, 3])
+  def build_network(self, inputs, is_training):
+    """Builds the forward pass of the model.
 
+    Args:
+      inputs: the list of inputs, excluding labels
+      is_training: if in the phrase of training.
+
+    Returns:
+      The logits of the model.
+    """
+    output = _construct_vgg(inputs, [2, 2, 3, 3, 3], self.channel_pos, 
+            is_training)
+    stdv = np.sqrt(1.0 / self.num_classes)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=output,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    return logits
 
 class Vgg19Model(model.Model):
 
   def __init__(self, params=None):
-    super(Vgg19Model, self).__init__(224, 64, 0.005, params=params)
+    super(Vgg19Model, self).__init__(
+            default_config['image_size'],
+            default_config['num_classes'],
+            params=params)
 
-  def add_inference(self, cnn):
-    _construct_vgg(cnn, [2, 2, 4, 4, 4])
+  def build_network(self, inputs, is_training):
+    """Builds the forward pass of the model.
+
+    Args:
+      inputs: the list of inputs, excluding labels
+      is_training: if in the phrase of training.
+
+    Returns:
+      The logits of the model.
+    """
+    output = _construct_vgg(inputs, [2, 2, 4, 4, 4], self.channel_pos, 
+            is_training)
+    stdv = np.sqrt(1.0 / self.num_classes)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=output,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    return logits

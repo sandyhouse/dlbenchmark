@@ -183,7 +183,6 @@ class GooglenetModel(model.Model):
             padding='valid',
             data_format=self.channel_pos
             )
-    #cnn.reshape([-1, 1024])
     output12 = tf.reshape(pool11, [-1, 1024])
     stddev = np.sqrt(1.0 / self.num_classes)
     logits = tf.contrib.layers.fully_connected(
