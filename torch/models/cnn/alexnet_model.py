@@ -53,6 +53,7 @@ class AlexnetModel(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=0),
             )
+    slef.pool = nn.AdaptiveAvgPool2d((6, 6))
     self.classifier = nn.Sequential(
             nn.Dropout(p=0.5),
             nn.Linear(256 * 6 * 6, 4096),
@@ -76,6 +77,7 @@ class AlexnetModel(nn.Module):
       The logits of the model.
     """
     output = self.conv(inputs)
+    output = self.pool(output)
     output = output.view(x.size(0), 256 * 6 * 6)
     logits = self.classifier(output)
     return logits
