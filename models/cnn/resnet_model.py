@@ -1,4 +1,4 @@
-# -*- encoding:utf-8 -*-
+# -*- coding:utf-8 -*-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -62,7 +62,7 @@ def conv_bn_layer(inputs,
     activation: activation function, e.g., tf.nn.relu
     channel_pos: 'channels_first' or 'channels_last'
   """
-  kernel_initializer = tf.variance_scaling_initializer
+  kernel_initializer = tf.variance_scaling_initializer()
   if padding != 'same_resnet':
     conv = tf.layers.conv2d(
             inputs=inputs,
@@ -242,7 +242,7 @@ def bottleneck_block_v2(inputs, channels, depth, depth_bottleneck, stride,
             strides=stride,
             activation=None,
             use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer,
+            kernel_initializer=tf.variance_scaling_initializer(),
             padding='same',
             data_format=channel_pos
             )
@@ -334,7 +334,16 @@ class ResnetModel(model.Model):
               activation_fn=tf.nn.relu)
 
     axes = [1, 2] if self.data_format == 'NHWC' else [2, 3]
-    logits = tf.reduce_mean(output, axes, keepdims=False)
+    output = tf.reduce_mean(output, axes, keepdims=False)
+
+    stddev = np.sqrt(1.0 / self.num_classes)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=output,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+            biases_initializer=tf.constant_initializer(0)
+            )
     return logits
 
 def create_resnet50_model(params):
