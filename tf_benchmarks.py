@@ -24,9 +24,9 @@ import json
 try:
   import tensorflow as tf
 except ImportError:
-  print("To run benchmarks for TensoFlow backend, TensorFlow should be "
-        "installed.")
-  print("Instructions for install TensorFlow are as follow:")
+  print("To run benchmarks for TensoFlow, TensorFlow must be installed.")
+  print("Instructions on how to install TensorFlow can be found in the "
+        "following URL:")
   print("  - https://www.tensorflow.org/install")
   raise
 

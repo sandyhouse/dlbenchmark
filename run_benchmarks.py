@@ -1,4 +1,5 @@
-# -*- coding:utf-8 -*-
+# Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -44,7 +45,7 @@ def _validate_flags(params):
   if params.model is None:
     print("The model to benchmark is not specified.\n"
           "Using `--model` to specify a model to benchmark.")
-    print("All supported models are as following:")
+    print("All supported models are as follows:")
     print("=" * 30)
     for model in ALL_MODELS:
       print("    -%s" % model)
@@ -54,7 +55,7 @@ def _validate_flags(params):
 
   if not params.model in ALL_MODELS:
     print("The model `%s` is not implemented in our benchmarks." % params.model)
-    print("All supported models are as following:")
+    print("All supported models are as follows:")
     print("=" * 30)
     for model in ALL_MODELS:
       print("    -%s" % model)
@@ -64,7 +65,7 @@ def _validate_flags(params):
   
   if not (params.do_train or params.do_eval or params.do_predict):
     print("At least one of `--do_train`, `--do_eval` or `--do_predict` "
-          "should be specified.")
+          "must be specified.")
     exit()
   
   if (params.num_gpus == 0 and params.data_format != 'NHWC') or (
@@ -74,8 +75,8 @@ def _validate_flags(params):
 
   if params.ip_list:
     if params.job_name == None or params.job_index == None:
-      print("`--job_name` and `--job_index` should both be specified for "
-            "distributed training/evaluation. ")
+      print("`--job_name` and `--job_index` must both be specified for "
+            "distributed training/evaluation/prediction.")
       exit()
 
 def main(params):

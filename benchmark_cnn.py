@@ -65,13 +65,9 @@ def get_optimizer(params, learning_rate):
 def get_learning_rate(params, global_step):
   """Get a learning rate that decays step-wise."""
   if params.init_learning_rate is not None:
-    learning_rate = tf.train.exponential_decay(
-              params.init_learning_rate,
-              global_step,
-              10000,
-              0.96,
-              staircase=True)
-
+    boundaries = [1000 * x for x in [30, 60, 80, 90]]
+    values = [0.01, 0.001, 0.0001, 0.00001]
+    learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
     return learning_rate
   else:
     raise ValueError("`--init_learning_rate` must be specified.")
