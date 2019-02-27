@@ -65,7 +65,7 @@ def get_optimizer(params, learning_rate):
 def get_learning_rate(params, global_step):
   """Get a learning rate that decays step-wise."""
   if params.init_learning_rate is not None:
-    boundaries = [1000 * x for x in [30, 60, 80, 90]]
+    boundaries = [1000 * x for x in [30, 60, 80]]
     values = [0.01, 0.001, 0.0001, 0.00001]
     learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
     return learning_rate
