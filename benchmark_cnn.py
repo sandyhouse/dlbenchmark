@@ -26,7 +26,6 @@ from models.cnn import alexnet_model as alexnet
 from models.cnn import resnet_model as resnet
 from models.cnn import googlenet_model as googlenet
 from models.cnn import vgg_model as vgg
-from models.cnn import trivial_model as trivial
 import imagenet_datasets as datasets
 import utils
 

@@ -112,7 +112,7 @@ class AlexnetModel(model.Model):
     stdv = 1.0 / math.sqrt(conv3.shape.as_list()[1] * 3 * 3)
     conv4 = tf.layers.conv2d(
             inputs=conv3, 
-            filters=384,
+            filters=256,
             kernel_size=3,
             strides=1,
             padding='same',
@@ -142,18 +142,15 @@ class AlexnetModel(model.Model):
             data_format=self.channel_pos
             )
 
+    reshape = tf.reshape(pool5, [-1, 256 * 6 * 6])
+
     drop6 = tf.layers.dropout(
-            inputs=pool5,
+            inputs=reshape,
             rate=0.5,
             training=is_training
             )
 
-    stdv = 1.0 / math.sqrt(drop6.shape.as_list()[1] * drop6.shape.as_list()[2] *
-                           drop6.shape.as_list()[3] * 1.0)
-    drop6 = tf.layers.flatten(
-            inputs=drop6
-            )
-
+    stdv = 1.0 / math.sqrt(self.num_classes * 1.0)
     fc6 = tf.contrib.layers.fully_connected(
             inputs=drop6,
             num_outputs=4096,

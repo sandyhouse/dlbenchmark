@@ -41,14 +41,12 @@ def inception_module(inputs, cols, channel_pos):
     col_layers.append([])
     output = None
     for l, layer in enumerate(col):
-      ltype, filters = layer[0], layer[1]
-      kernel_size = layer[2]
-      if len(layer) > 4:
-        strides = layer[4]
-      else:
-        strides=1
+      ltype = layer[0]
 
       if ltype == 'conv':
+        filters = layer[1]
+        kernel_size = layer[2]
+        strides=1
         output = tf.layers.conv2d(
                 inputs=input_layer if l == 0 else output,
                 filters=filters,
@@ -61,12 +59,15 @@ def inception_module(inputs, cols, channel_pos):
                 bias_initializer=tf.constant_initializer(0)
                 )
       elif ltype == 'mpool':
+        kernel_size = layer[1]
+        strides = layer[3]
+        padding = layer[5]
         output = tf.layers.max_pooling2d(
                 inputs=input_layer if l == 0 else output,
                 pool_size=kernel_size,
                 strides=strides,
                 data_format=channel_pos,
-                padding='same'
+                padding=padding
                 )
       else:
         raise KeyError(
@@ -115,7 +116,7 @@ class GooglenetModel(model.Model):
             data_format=self.channel_pos,
             activation=tf.nn.relu,
             kernel_initializer=tf.variance_scaling_initializer(),
-            bias_initializer=tf.zeros_initializer()
+            bias_initializer=tf.constant_initializer(0.0)
             )
     pool1 = tf.layers.max_pooling2d(
             inputs=conv1,
@@ -133,7 +134,7 @@ class GooglenetModel(model.Model):
             data_format=self.channel_pos,
             activation=tf.nn.relu,
             kernel_initializer=tf.variance_scaling_initializer(),
-            bias_initializer=tf.zeros_initializer()
+            bias_initializer=tf.constant_initializer(0.0)
             )
     conv3 = tf.layers.conv2d(
             inputs=conv2,
@@ -144,7 +145,7 @@ class GooglenetModel(model.Model):
             data_format=self.channel_pos,
             activation=tf.nn.relu,
             kernel_initializer=tf.variance_scaling_initializer(),
-            bias_initializer=tf.zeros_initializer()
+            bias_initializer=tf.constant_initializer(0.0)
             )
     pool3 = tf.layers.max_pooling2d(
             inputs=conv3,
@@ -190,6 +191,6 @@ class GooglenetModel(model.Model):
             num_outputs=self.num_classes,
             activation_fn=None,
             weights_initializer=tf.truncated_normal_initializer(stddev),
-            biases_initializer=tf.constant_initializer(0)
+            biases_initializer=tf.constant_initializer(0.0)
             )
     return logits
