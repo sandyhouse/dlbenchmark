@@ -185,6 +185,8 @@ class Vgg11Model(model.Model):
     Returns:
       The logits of the model.
     """
+    if self.data_format == 'NCHW':
+      inputs = tf.transpose(inputs, [0, 3, 1, 2])
     output = _construct_vgg(inputs, [1, 1, 2, 2, 2], self.channel_pos, 
             is_training)
     stdv = np.sqrt(1.0 / self.num_classes)
@@ -215,6 +217,8 @@ class Vgg16Model(model.Model):
     Returns:
       The logits of the model.
     """
+    if self.data_format == 'NCHW':
+      inputs = tf.transpose(inputs, [0, 3, 1, 2])
     output = _construct_vgg(inputs, [2, 2, 3, 3, 3], self.channel_pos, 
             is_training)
     stdv = np.sqrt(1.0 / self.num_classes)
