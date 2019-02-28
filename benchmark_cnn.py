@@ -37,19 +37,19 @@ MODEL_CREATOR = {
         'vgg16': vgg.Vgg16Model,
 }
 
-class ExamplesPerSecondHook(tf.estimator.SessionRunHook):
+class ExamplesPerSecondHook(tf.train.SessionRunHook):
   """Hook to display examples per second."""
 
   def __init__(self,
                batch_size,
-               every_n_steps=100)
+               every_n_steps=100):
     """Intializer.
 
     Args:
       batch_size: Total batch size across all workers.
       every_n_steps: Display the message every n steps.
     """
-    self.timer = tf.estimator.SecondOrStepTimer(every_n_steps=every_n_steps)
+    self.timer = tf.train.SecondOrStepTimer(every_steps=every_n_steps)
     self.train_time = 0
     self.total_steps = 0
     self.batch_size = batch_size
@@ -61,7 +61,7 @@ class ExamplesPerSecondHook(tf.estimator.SessionRunHook):
       raise RuntimeError("Global step must be created before using this hook.")
   
   def before_run(self, run_context):
-    return tf.estimator.SessionRunArgs(self.global_step)
+    return tf.train.SessionRunArgs(self.global_step)
   
   def after_run(self, run_context, run_values):
     global_step = run_values.result
