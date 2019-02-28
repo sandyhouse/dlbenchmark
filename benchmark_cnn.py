@@ -315,7 +315,8 @@ class BenchmarkCNN(object):
       print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
       experments_per_sec_list = time_hist.examples_per_second_list
-      with open(os.path.join(self.params.output_dir, 'results.txt'), 'w') as f:
+      with open(os.path.join(self.params.output_dir, 
+          self.params.model + '.txt'), 'w+') as f:
         for experiments_per_sec in experments_per_sec_list:
           line = "experiments_per_sec: " + str(experiments_per_sec)
           f.writelines(line)
