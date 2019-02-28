@@ -306,14 +306,14 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    time_hist = ExamplesPerSecondHook(self.params.batch_size)
+    train_hook = ExamplesPerSecondHook(self.params.batch_size)
 
     if self.do_train:
       classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
-                       hooks=[time_hist])
-      #total_time = sum(time_hist.times)
-      #print("Totoal time with {} GPU(s): {} seconds.".format(
-      #      self.num_gpus, total_time))
+                       hooks=[train_hook])
+      total_time = train_hook.train_time
+      print("Totoal time with {} GPU(s): {} seconds.".format(
+            self.num_gpus, total_time))
       experments_per_sec_list = time_hist.examples_per_second_list
       with open(os.path.join(self.params.output_dir, 'results.txt'), 'w') as f:
         for experiments_per_sec in experments_per_sec_list:
