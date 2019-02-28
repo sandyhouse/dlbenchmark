@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import time
 import numpy as np
+import os
 
 import tensorflow as tf
 
@@ -35,6 +36,51 @@ MODEL_CREATOR = {
         'googlenet': googlenet.GooglenetModel,
         'vgg16': vgg.Vgg16Model,
 }
+
+class ExamplesPerSecondHook(tf.estimator.SessionRunHook):
+  """Hook to display examples per second."""
+
+  def __init__(self,
+               batch_size,
+               every_n_steps=100)
+    """Intializer.
+
+    Args:
+      batch_size: Total batch size across all workers.
+      every_n_steps: Display the message every n steps.
+    """
+    self.timer = tf.estimator.SecondOrStepTimer(every_n_steps=every_n_steps)
+    self.train_time = 0
+    self.total_steps = 0
+    self.batch_size = batch_size
+    self.examples_per_second_list = []
+  
+  def begin(self):
+    self.global_step = tf.train.get_global_step()
+    if self.global_step == None:
+      raise RuntimeError("Global step must be created before using this hook.")
+  
+  def before_run(self, run_context):
+    return tf.estimator.SessionRunArgs(self.global_step)
+  
+  def after_run(self, run_context, run_values):
+    global_step = run_values.result
+
+    if self.timer.should_trigger_for_step(global_step):
+      elapsed_time, elapsed_steps = self.timer.update_last_triggered_step(
+              global_step)
+      if elapsed_time is not None:
+        self.total_steps += elapsed_steps
+        self.train_time += elapsed_time
+        average_examples_per_sec = self.batch_size * (
+            self.total_steps / self.train_time)
+        current_examples_per_sec = self.batch_size * (
+            elapsed_steps / elapsed_time)
+        self.examples_per_second_list.append(current_examples_per_sec)
+        tf.logging.INFO("average_examples_per_sec: {}".format(
+            average_examples_per_sec))
+        tf.logging.INFO("current_examples_per_sec: {}".format(
+            current_examples_per_sec))
 
 class TimeHistory(tf.train.SessionRunHook):
   """Record the run time for each iteration of training/evaluation."""
@@ -260,21 +306,26 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    time_hist = TimeHistory()
+    time_hist = ExamplesPerSecondHook(self.params.batch_size)
 
     if self.do_train:
       classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
                        hooks=[time_hist])
-      total_time = sum(time_hist.times)
-      print("Totoal time with {} GPU(s): {} seconds.".format(
-            self.num_gpus, total_time))
+      #total_time = sum(time_hist.times)
+      #print("Totoal time with {} GPU(s): {} seconds.".format(
+      #      self.num_gpus, total_time))
+      experments_per_sec_list = time_hist.examples_per_second_list
+      with open(os.path.join(self.params.output_dir, 'results.txt'), 'w') as f:
+        for experiments_per_sec in experments_per_sec_list:
+          line = "experiments_per_sec: " + str(experiments_per_sec)
+          f.writelines(line)
 
       #max_time_index = np.argmax(time_hist.times)
       #min_time_index = np.argmin(time_hist.times)
       #max_time = time_hist.times[max_time_index]
       #min_time = time_hist.times[min_time_index]
-      avg_time = np.mean(time_hist.times) # per batch
-      print("{} images/second (avg).".format(self.batch_size/avg_time))
+      #avg_time = np.mean(time_hist.times) # per batch
+      #print("{} images/second (avg).".format(self.batch_size/avg_time))
       #print("{} images/second (max).".format(self.batch_size/max_time))
       #print("{} images/second (min).".format(self.batch_size/min_time))
     else:

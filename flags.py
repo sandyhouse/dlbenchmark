@@ -126,6 +126,10 @@ def define_flags():
                       type=str,
                       default='/tmp',
                       help="Directory where model checkpoints will be stored.")
+  parser.add_argument("--output_dir",
+                      type=str,
+                      default='/tmp',
+                      help="Directory where program output will be stored.")
   parser.add_argument("--init_checkpoint",
                       type=str,
                       default=None,
