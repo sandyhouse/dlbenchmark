@@ -329,7 +329,7 @@ class BenchmarkCNN(object):
       #print("{} images/second (avg).".format(self.batch_size/avg_time))
       #print("{} images/second (max).".format(self.batch_size/max_time))
       #print("{} images/second (min).".format(self.batch_size/min_time))
-    else:
+    if self.do_eval:
       results = classifier.evaluate(input_fn=lambda: input_fn_eval())
       print("accuracy: {}, accuracy_top_5: {}".format(
           results['accuracy'], results['accuracy_top_5']))
