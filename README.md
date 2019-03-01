@@ -7,3 +7,10 @@ The benchmarks support the following models.
 + ResNet50
 + ResNet101
 + ResNet152
++ GoogleNet
++ VGG11
++ VGG13
++ VGG16
++ VGG19
+
+## User Guides
