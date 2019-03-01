@@ -199,7 +199,7 @@ def input_fn(is_training, data_dir, batch_size, num_epochs=1,
   if is_training:
     dataset = dataset.shuffle(buffer_size=_SHUFFLE_BUFFER)
 
-  dataset = dataset.repeat(num_epochs)
+  dataset = dataset.repeat(int(num_epochs))
 
   dataset = dataset.apply(
         tf.data.experimental.map_and_batch(

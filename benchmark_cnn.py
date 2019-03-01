@@ -64,7 +64,7 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
     return tf.train.SessionRunArgs(self.global_step)
   
   def after_run(self, run_context, run_values):
-    global_step = run_values.result
+    global_step = run_values.results
 
     if self.timer.should_trigger_for_step(global_step):
       elapsed_time, elapsed_steps = self.timer.update_last_triggered_step(
@@ -77,9 +77,9 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
         current_examples_per_sec = self.batch_size * (
             elapsed_steps / elapsed_time)
         self.examples_per_second_list.append(current_examples_per_sec)
-        tf.logging.INFO("average_examples_per_sec: {}".format(
+        tf.logging.info("average_examples_per_sec: {}".format(
             average_examples_per_sec))
-        tf.logging.INFO("current_examples_per_sec: {}".format(
+        tf.logging.info("current_examples_per_sec: {}".format(
             current_examples_per_sec))
 
 class TimeHistory(tf.train.SessionRunHook):
@@ -314,7 +314,7 @@ class BenchmarkCNN(object):
       total_time = train_hook.train_time
       print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
-      experments_per_sec_list = time_hist.examples_per_second_list
+      experments_per_sec_list = train_hook.examples_per_second_list
       with open(os.path.join(self.params.output_dir, 
           self.params.model + '.txt'), 'w+') as f:
         for experiments_per_sec in experments_per_sec_list:
