@@ -77,10 +77,12 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
         current_examples_per_sec = self.batch_size * (
             elapsed_steps / elapsed_time)
         self.examples_per_second_list.append(current_examples_per_sec)
-        tf.logging.info("average_examples_per_sec: {}".format(
-            average_examples_per_sec))
-        tf.logging.info("current_examples_per_sec: {}".format(
-            current_examples_per_sec))
+        out_str = "average_examples_per_sec: {}".format(
+                  average_examples_per_sec)
+        tf.logging.info(out_str)
+        out_str = "current_examples_per_sec: {}".format(
+                  current_examples_per_sec)
+        tf.logging.info(out_str)
 
 class TimeHistory(tf.train.SessionRunHook):
   """Record the run time for each iteration of training/evaluation."""
@@ -306,30 +308,34 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    train_hook = ExamplesPerSecondHook(self.params.batch_size)
+    for i in xrange(int(self.num_epochs)):
+      train_hook = ExamplesPerSecondHook(self.params.batch_size)
 
-    if self.do_train:
-      classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
+      if self.do_train:
+        classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
                        hooks=[train_hook])
-      total_time = train_hook.train_time
-      print("Totoal time with {} GPU(s): {} seconds.".format(
+        total_time = train_hook.train_time
+        print("Totoal time with {} GPU(s): {} seconds.".format(
             self.num_gpus, total_time))
-      experments_per_sec_list = train_hook.examples_per_second_list
-      with open(os.path.join(self.params.output_dir, 
-          self.params.model + '.txt'), 'w+') as f:
-        for experiments_per_sec in experments_per_sec_list:
-          line = "experiments_per_sec: " + str(experiments_per_sec)
-          f.writelines(line)
+        experments_per_sec_list = train_hook.examples_per_second_list
+        #with open(os.path.join(self.params.output_dir, 
+        #    self.params.model + '.txt'), 'w+') as f:
+        #  for experiments_per_sec in experments_per_sec_list:
+        #    line = "experiments_per_sec: " + str(experiments_per_sec) + '\n'
+        #    f.writelines(line)
+        cur_examples_per_sec = train_hook.examples_per_second_list[
+                 len(train_hook.examples_per_second_list) - 1]
+        print("Current examples per second: {}.".format(cur_examples_per_sec))
 
-      #max_time_index = np.argmax(time_hist.times)
-      #min_time_index = np.argmin(time_hist.times)
-      #max_time = time_hist.times[max_time_index]
-      #min_time = time_hist.times[min_time_index]
-      #avg_time = np.mean(time_hist.times) # per batch
-      #print("{} images/second (avg).".format(self.batch_size/avg_time))
-      #print("{} images/second (max).".format(self.batch_size/max_time))
-      #print("{} images/second (min).".format(self.batch_size/min_time))
-    if self.do_eval:
-      results = classifier.evaluate(input_fn=lambda: input_fn_eval())
-      print("accuracy: {}, accuracy_top_5: {}".format(
-          results['accuracy'], results['accuracy_top_5']))
+        #max_time_index = np.argmax(time_hist.times)
+        #min_time_index = np.argmin(time_hist.times)
+        #max_time = time_hist.times[max_time_index]
+        #min_time = time_hist.times[min_time_index]
+        #avg_time = np.mean(time_hist.times) # per batch
+        #print("{} images/second (avg).".format(self.batch_size/avg_time))
+        #print("{} images/second (max).".format(self.batch_size/max_time))
+        #print("{} images/second (min).".format(self.batch_size/min_time))
+      if self.do_eval:
+        results = classifier.evaluate(input_fn=lambda: input_fn_eval())
+        print("accuracy: {}, accuracy_top_5: {}".format(
+            results['accuracy'], results['accuracy_top_5']))
