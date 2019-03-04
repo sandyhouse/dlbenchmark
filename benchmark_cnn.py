@@ -54,6 +54,7 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
     self.total_steps = 0
     self.batch_size = batch_size
     self.examples_per_second_list = []
+    self.average_examples_per_sec = 0
   
   def begin(self):
     self.global_step = tf.train.get_global_step()
@@ -72,7 +73,7 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
       if elapsed_time is not None:
         self.total_steps += elapsed_steps
         self.train_time += elapsed_time
-        average_examples_per_sec = self.batch_size * (
+        self.average_examples_per_sec = self.batch_size * (
             self.total_steps / self.train_time)
         current_examples_per_sec = self.batch_size * (
             elapsed_steps / elapsed_time)
@@ -323,9 +324,11 @@ class BenchmarkCNN(object):
         #  for experiments_per_sec in experments_per_sec_list:
         #    line = "experiments_per_sec: " + str(experiments_per_sec) + '\n'
         #    f.writelines(line)
-        cur_examples_per_sec = train_hook.examples_per_second_list[
-                 len(train_hook.examples_per_second_list) - 1]
-        print("Current examples per second: {}.".format(cur_examples_per_sec))
+        #cur_examples_per_sec = train_hook.examples_per_second_list[
+        #         len(train_hook.examples_per_second_list) - 1]
+        average_examples_per_sec = train_hook.average_examples_per_sec
+        print("Current examples per second: {}.".format(
+            average_examples_per_sec))
 
         #max_time_index = np.argmax(time_hist.times)
         #min_time_index = np.argmin(time_hist.times)
