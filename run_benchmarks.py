@@ -26,6 +26,7 @@ import flags
 
 # All supported models to benchmark.
 ALL_MODELS = ['alexnet',
+              'alexnet_cifar10',
               'resnet50',
               'googlenet',
               'vgg16',

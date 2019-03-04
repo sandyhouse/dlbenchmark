@@ -184,3 +184,98 @@ class AlexnetModel(model.Model):
             )
 
     return logits
+
+
+class AlexnetCifar10Model(model.Model):
+  """Alexnet model for ImageNet."""
+
+  def __init__(self, params=None):
+    super(AlexnetCifar10Model, self).__init__(
+            32,
+            10,
+            params=params)
+
+  def build_network(self, inputs, is_training):
+    """Builds the forward pass of the model.
+
+    Args:
+      inputs: the list of inputs, excluding labels
+      is_training: if in the phrase of training.
+
+    Returns:
+      The logits of the model.
+    """
+    if self.data_format == 'NCHW':
+      inputs = tf.transpose(inputs, [0, 3, 1, 2])
+
+    stdv = 1.0 / math.sqrt(inputs.shape.as_list()[1] * 11 * 11)
+    conv1 = tf.layers.conv2d(
+            inputs=inputs, 
+            filters=64,
+            kernel_size=5,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    pool1 = tf.layers.max_pooling2d(
+            inputs=conv1,
+            pool_size=3,
+            strides=2,
+            padding='same',
+            data_format=self.channel_pos
+            )
+
+    stdv = 1.0 / math.sqrt(pool1.shape.as_list()[1] * 5 * 5)
+    conv2 = tf.layers.conv2d(
+            inputs=pool1, 
+            filters=64,
+            kernel_size=5,
+            strides=1,
+            padding='same',
+            data_format=self.channel_pos,
+            activation=tf.nn.relu,
+            kernel_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            bias_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+    pool2 = tf.layers.max_pooling2d(
+            inputs=conv2,
+            pool_size=3,
+            strides=2,
+            padding='same',
+            data_format=self.channel_pos
+            )
+
+    shape = pool2.get_shape().as_list()
+    flat_dim = shape[1] * shape[2] * shape[3]
+    reshape = tf.reshape(pool2, [-1, flat_dim])
+
+    stdv = 1.0 / math.sqrt(self.num_classes * 1.0)
+    fc3 = tf.contrib.layers.fully_connected(
+            inputs=reshape,
+            num_outputs=384,
+            activation_fn=tf.nn.relu,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    fc4 = tf.contrib.layers.fully_connected(
+            inputs=fc3,
+            num_outputs=192,
+            activation_fn=tf.nn.relu,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    stdv = 1.0 / math.sqrt(fc4.shape.as_list()[1] * 1.0)
+    logits = tf.contrib.layers.fully_connected(
+            inputs=fc4,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.initializers.random_uniform(-stdv, stdv),
+            biases_initializer=tf.initializers.random_uniform(-stdv, stdv)
+            )
+
+    return logits

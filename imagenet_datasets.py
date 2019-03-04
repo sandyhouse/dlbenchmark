@@ -94,7 +94,7 @@ def _parse_example_proto(example_serialized):
       'image/class/text': tf.io.FixedLenFeature([], dtype=tf.string,
                                                 default_value=''),
   }
-  sparse_float32 = tf.io.VarLenFeature(dtype=tf.float32)
+  #sparse_float32 = tf.io.VarLenFeature(dtype=tf.float32)
   # Sparse features in Example proto.
   #feature_map.update(
   #    {k: sparse_float32 for k in ['image/object/bbox/xmin',

@@ -28,10 +28,12 @@ from models.cnn import resnet_model as resnet
 from models.cnn import googlenet_model as googlenet
 from models.cnn import vgg_model as vgg
 import imagenet_datasets as datasets
+import cifar10_datasets as cifar10_datasets
 import utils
 
 MODEL_CREATOR = {
         'alexnet': alexnet.AlexnetModel,
+        'alexnet_cifar10': alexnet.AlexnetCifar10Model,
         'resnet50': resnet.create_resnet50_model,
         'googlenet': googlenet.GooglenetModel,
         'vgg16': vgg.Vgg16Model,
@@ -79,7 +81,7 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
             elapsed_steps / elapsed_time)
         self.examples_per_second_list.append(current_examples_per_sec)
         out_str = "average_examples_per_sec: {}".format(
-                  average_examples_per_sec)
+                  self.average_examples_per_sec)
         tf.logging.info(out_str)
         out_str = "current_examples_per_sec: {}".format(
                   current_examples_per_sec)
@@ -287,10 +289,15 @@ class BenchmarkCNN(object):
         config=run_config,
         params=self.params)
 
+    use_cifar10 = True if 'cifar10' in self.params.model else False
+
     if self.use_synthetic_data:
       input_function = datasets.get_synth_input_fn(self.data_type)
     else:
-      input_function = datasets.input_fn
+      if use_cifar10:
+        input_function = cifar10_datasets.input_fn
+      else:
+        input_function = datasets.input_fn
 
     def input_fn_train(num_epochs):
       return input_function(
