@@ -110,7 +110,7 @@ def main(params):
     import tf_benchmarks
     tf_benchmarks.main(params)
   else:
-    import torch.torch_benchmarks as torch_benchmarks
+    import pytorch.torch_benchmarks as torch_benchmarks
     torch_benchmarks.main(params)
 
 if __name__ == '__main__':
