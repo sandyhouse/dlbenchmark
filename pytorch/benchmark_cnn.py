@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import time
+import os
 import numpy as np
 
 import pytorch.models.cnn.alexnet_model as alexnet
@@ -51,6 +52,7 @@ MODEL_CREATOR = {
         'resnet50': resnet.create_resnet50,
         'vgg16': vgg.create_vgg16,
     }
+
 class BenchmarkCNN(object):
   """Class for benchmarking a cnn network."""
 
@@ -137,7 +139,8 @@ class BenchmarkCNN(object):
     if self.params.multiprocessing_distributed:
       self.params.world_size = self.num_gpus * self.params.world_size
       mp.spawn(main_worker, nprocs=self.num_gpus, 
-               args=(self.model, self.num_gpus, self.distributed, self.params))
+               args=(self.model, self.num_gpus, 
+                   self.params.distributed, self.params))
     else:
       main_worker(self.model, self.num_gpus, self.params.distributed,
               self.params)
@@ -162,7 +165,7 @@ def main_worker(model, num_gpus, distributed, params):
 #        model = torch.nn.DataParallel(model).cuda()
 #    
     criterion = torch.nn.CrossEntropyLoss().cuda(0)
-    optimizer = get_optimizer(params.model, params, params.init_learning_rate)
+    optimizer = get_optimizer(model, params, params.init_learning_rate)
 #
     if params.data_dir:
       checkpoint_file = os.path.join(params.data_dir, 'checkpoint.ckt')
@@ -178,7 +181,7 @@ def main_worker(model, num_gpus, distributed, params):
 
     train_data_dir = os.path.join(params.data_dir, 'train')
     if params.do_eval:
-      eval_data_dir = os.path.join(self.params.data_dir, 'eval')
+      eval_data_dir = os.path.join(params.data_dir, 'eval')
 
     normalized = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                   std=[0.229, 0.224, 0.225])
@@ -198,34 +201,34 @@ def main_worker(model, num_gpus, distributed, params):
       train_sampler = None
 
     train_data_loader = torch.utils.data.DataLoader(
-            train_data, batch_size=self.params.batch_size, 
+            train_data, batch_size=params.batch_size, 
             shuffle=(train_sampler is None),
             num_workers=params.workers, pin_memory=True, 
             sampler=train_sampler)
 
-    if params.eval:
+    if params.do_eval:
       eval_data = torchvision.datasets.ImageFolder(
             eval_data_dir,
             torchvision.transforms.Compose([
-                torchvision.transforms.Resized(256),
+                torchvision.transforms.Resize(256),
                 torchvision.transforms.CenterCrop(224),
                 torchvision.transforms.ToTensor(),
                 normalized]))
             
       eval_data_loader = torch.utils.data.DataLoader(
-             eval_data, batch_size=self.params.batch_size, 
+             eval_data, batch_size=params.batch_size, 
              shuffle=False,
              num_workers=params.workers, pin_memory=True)
 
-
-    for epoch in range(start_epoch, params.num_epochs):
+    start_epoch = 0
+    for epoch in range(start_epoch, int(params.num_epochs)):
       epoch_start_time = time.time()
       if params.distributed:
         train_sampler.set_epoch(epoch)
-      adjust_learning_rate(optimizer, epoch)
+      adjust_learning_rate(optimizer, epoch, params)
 
       # train for one epoch.
-      train(train_loader, model, criterion, optimizer, epoch)
+      train(train_data_loader, model, criterion, optimizer, epoch, params)
 
       print("Epoch {} ran time: {}".format(
           epoch, time.time() - epoch_start_time))
@@ -242,7 +245,7 @@ def main_worker(model, num_gpus, distributed, params):
           }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, params):
   """Train for one epoch."""
   batch_time = AverageMeter()
   data_time = AverageMeter()
@@ -257,7 +260,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     # measure data loading time
     data_time.update(time.time() - end)
 
-    if self.params.num_gpus == 1:
+    if params.num_gpus == 1:
       inputs = inputs.cuda(0, non_blocking=True)
     label = label.cuda(0, non_blocking=True)
     output = model(inputs)
@@ -269,7 +272,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     top5.update(acc5[0], inputs.size(0))
 
     optimizer.zero_grad()
-    losses.backward()
+    loss.backward()
     optimizer.step()
 
     batch_time.update(time.time() - end)

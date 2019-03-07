@@ -78,6 +78,6 @@ class AlexnetModel(nn.Module):
     """
     output = self.conv(inputs)
     output = self.pool(output)
-    output = output.view(x.size(0), 256 * 6 * 6)
+    output = output.view(output.size(0), 256 * 6 * 6)
     logits = self.classifier(output)
     return logits
