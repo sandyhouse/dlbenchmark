@@ -22,22 +22,32 @@ import os
 import shutil
 import numpy as np
 
-import pytorch.models.cnn.alexnet_model as alexnet
+#impor pytorcumodels.cnn.alexnet_model as alexnet
 #import pytorch.models.cnn.resnet_model as resnet
-#import pytorch.models.cnn.googlenet_model as googlenet
+##import pytorch.models.cnn.googlenet_model as googlenet
 #import pytorch.models.cnn.vgg_model as vgg
 
 import torch
-import torch.multiprocessing as mp
+import torch.nn as nn
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torch.distributed as dist
+import torch.optim
+import torch.utils.data
+import torch.utils.data.distributed
 import torchvision
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+import torchvision.models as models
+
+model_names = sorted(name for name in models.__dict__
+                     if name.islower() and not name.startswith("__")
+                     and callable(models.__dict__[name]))
 
 def get_optimizer(model, params):
   """Returns the optimizer that should be used based on params."""
   learning_rate = params.init_learning_rate
-  if params.optimizer == 'momentum':
-    opt = torch.optim.SGD(model.parameters(), lr=learning_rate,
-                          momentum=params.momentum, nesterov=True)
-  elif params.optimizer == 'sgd':
+  if params.optimizer == 'sgd':
     opt = torch.optim.SGD(model.parameters(), lr=learning_rate)
   elif params.optimizer == 'adam':
     opt = torch.optim.Adam(model.parameters(),
@@ -49,11 +59,11 @@ def get_optimizer(model, params):
                      format(params.optimizer))
   return opt
 
-MODEL_CREATOR = {
-        'alexnet': alexnet.AlexnetModel,
-        #'resnet50': resnet.create_resnet50,
-        #'vgg16': vgg.create_vgg16,
-    }
+#MODEL_CREATOR = {
+#        'alexnet': alexnet.AlexnetModel,
+#        'resnet50': resnet.create_resnet50,
+#        'vgg16': vgg.create_vgg16,
+#    }
 
 class BenchmarkCNN(object):
   """Class for benchmarking a cnn network."""
@@ -68,14 +78,14 @@ class BenchmarkCNN(object):
     """
     self.params = params
 
-    self.params.total_batch_size = self.params.batch_size
+    #self.params.total_batch_size = self.params.batch_size
+    
 
-    if self.params.num_gpus:
-      self.params.total_batch_size *= self.params.num_gpus
+    #if self.params.num_gpus:
+    #  self.params.batch_size *= self.params.num_gpus
 
-    self.num_epochs = self.params.num_epochs
 
-    self.params.use_synthetic_data = False if self.params.data_dir else True
+    self.params.synthetic_data = False if self.params.data_dir else True
 
     if self.params.use_fp16:
       self.params.data_type = torch.float16
@@ -83,7 +93,6 @@ class BenchmarkCNN(object):
       self.params.data_type = torch.float32
 
     self.params.distributed = True if self.params.ip_list else False
-    self.params.world_size = 1
     if self.params.ip_list:
       ips = self.params.ip_list.split(',')
       self.params.world_size = len(ips)
@@ -92,17 +101,17 @@ class BenchmarkCNN(object):
       # url used to set up distributed environment
       self.params.dist_url = "tcp://" + address
       self.params.dist_backend = "nccl"
-    self.params.multiprocessing_distributed = False
-    if self.params.num_gpus > 1:
-      self.params.multiprocessing_distributed = True
-      self.params.world_size *= self.params.num_gpus
-    self.params.workers = 0 # Number of data loading workers.
+      dist.init_process_group(backend=self.params.dist_backend,
+                              init_method=self.params.dist_url,
+                              world_size=self.params.world_size,
+                              rank=self.params.rank)
+    self.params.workers = 20 # Number of data loading workers.
 
     self.print_info()
     
   def print_info(self):
     """Print basic information."""
-    dataset_name = "ImageNet-synthetic" if self.params.use_synthetic_data else (
+    dataset_name = "ImageNet-synthetic" if self.params.synthetic_data else (
                    "ImageNet")
     mode = ""
     if self.params.do_train:
@@ -115,8 +124,8 @@ class BenchmarkCNN(object):
     print('Dataset:     %s' % dataset_name)
     print('Mode:        %s' % mode)
     print('Batch size:  %s global (per machine)' % (
-           self.params.total_batch_size))
-    print('             %s per device' % (self.params.batch_size))
+           self.params.batch_size))
+    #print('             %s per device' % (self.params.batch_size))
     print('Num GPUs:    %d per worker' % (self.params.num_gpus))
     print('Num epochs:  %d' % self.params.num_epochs)
     print('Data format: %s' % self.params.data_format)
@@ -125,108 +134,92 @@ class BenchmarkCNN(object):
 
   def run(self):
     """Run the benchmark task assigned to this process."""
-    if self.params.multiprocessing_distributed:
-      mp.spawn(main_worker, nprocs=self.params.num_gpus, 
-               args=(self.params))
+    print("Creating model '{}'".format(self.params.model))
+    #model = MODEL_CREATOR[self.params.model]()
+    model = models.__dict__[self.params.model]()
+    if self.params.num_gpus == 1 and not self.params.distributed:
+      torch.cuda.set_device(0)
+      model = model.cuda(0)
+    elif self.params.distributed:
+      model.cuda()
+      model = torch.nn.parallel.DistributedDataParallel(model)
     else:
-      main_worker(0, self.params)
+      if self.params.model.startswith('alexnet') or (
+                self.params.model.startswith('vgg')):
+        model.features = torch.nn.DataParallel(model.features)
+        model.cuda()
+      else:
+        model = torch.nn.DataParallel(model).cuda()
 
-def main_worker(gpu_id, params=None):
-  model = MODEL_CREATOR[params.model]()
-  if params.num_gpus == 1 and not params.distributed:
-    model = model.cuda(gpu_id)
-  else: #self.distributed:
-    model.cuda()
-    model = torch.nn.parallel.DistributedDataParallel(model)
-    self.params.rank = self.params.rank * params.num_gpus + gpu_id
-    dist.init_process_group(backend=params.dist_backend,
-            init_method=params.dist_url,
-            world_size=params.world_size,
-            rank=params.rank)
+    criterion = torch.nn.CrossEntropyLoss().cuda()
+    optimizer = get_optimizer(model, self.params)
 
-  criterion = torch.nn.CrossEntropyLoss().cuda(gpu_id)
-  optimizer = get_optimizer(model, params)
+    cudnn.benchmark = True
+    train_dir = os.path.join(self.params.data_dir, 'train')
+    eval_dir = os.path.join(self.params.data_dir, 'eval')
 
-  start_epoch = 0
-  if params.data_dir:
-    checkpoint_file = os.path.join(params.data_dir, 'checkpoint.ckt')
-    if os.path.isfile(checkpoint_file):
-      print("Loading checkpoint: {}".format(checkpoint))
-      checkpoint = torch.load(checkpoint)
-      start_epoch = checkpoint['epoch']
-      top_1_acc = checkpoint['top_1_acc1']
-      model.load_state_dict(checkpoint['state_dict'])
-      optimizer.load_state_dict(checkpoint['optimizer'])
-      print("Loaded checkpoint {} at epoch {}"
-              .format(checkpoint, start_epoch))
+    normalized = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                  std=[0.229, 0.224, 0.225])
 
-  train_data_dir = os.path.join(params.data_dir, 'train_by_label')
-  if params.do_eval:
-    eval_data_dir = os.path.join(params.data_dir, 'eval_by_label')
+    train_dataset = torchvision.datasets.ImageFolder(
+            train_dir,
+            torchvision.transforms.Compose([
+                torchvision.transforms.RandomResizedCrop(224),
+                torchvision.transforms.RandomHorizontalFlip(),
+                torchvision.transforms.ToTensor(),
+                normalized]))
 
-  normalized = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                std=[0.229, 0.224, 0.225])
+    if self.params.distributed:
+      train_sampler = torch.utils.data.distributed.DistributedSampler(
+              train_dataset)
+    else:
+      train_sampler = None
 
-  train_data = torchvision.datasets.ImageFolder(
-          train_data_dir,
-          torchvision.transforms.Compose([
-              torchvision.transforms.RandomResizedCrop(224),
-              torchvision.transforms.RandomHorizontalFlip(),
-              torchvision.transforms.ToTensor(),
-              normalized]))
+    train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=self.params.batch_size,
+            shuffle=(train_sampler is None),
+            num_workers=self.params.workers, pin_memory=True, 
+            sampler=train_sampler)
 
-  if params.distributed:
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_data)
-  else:
-    train_sampler = None
-
-  train_data_loader = torch.utils.data.DataLoader(
-          train_data, batch_size=params.batch_size, 
-          shuffle=(train_sampler is None),
-          num_workers=params.workers, pin_memory=True, 
-          sampler=train_sampler)
-
-  if params.do_eval:
-    eval_data = torchvision.datasets.ImageFolder(
-          eval_data_dir,
-          torchvision.transforms.Compose([
-              torchvision.transforms.Resize(256),
-              torchvision.transforms.CenterCrop(224),
-              torchvision.transforms.ToTensor(),
-              normalized]))
+    if self.params.do_eval:
+      eval_dataset = torchvision.datasets.ImageFolder(
+            eval_dir,
+            torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
+            normalized]))
           
-    eval_data_loader = torch.utils.data.DataLoader(
-           eval_data, batch_size=params.batch_size, 
+      eval_loader = torch.utils.data.DataLoader(
+           eval_dataset, batch_size=self.params.batch_size, 
            shuffle=False,
-           num_workers=params.workers, pin_memory=True)
+           num_workers=self.params.workers, pin_memory=True)
 
+    for epoch in range(int(self.params.num_epochs)):
+      if self.params.distributed:
+        train_sampler.set_epoch(epoch)
+      adjust_learning_rate(optimizer, epoch, self.params)
 
-  for epoch in range(start_epoch, int(params.num_epochs)):
-    epoch_start_time = time.time()
-    if params.distributed:
-      train_sampler.set_epoch(epoch)
-    adjust_learning_rate(optimizer, epoch, params)
+      epoch_start_time = time.time()
+      # train for one epoch.
+      train(train_loader, model, criterion, optimizer, epoch, self.params)
 
-    # train for one epoch.
-    train(train_data_loader, model, criterion, optimizer, epoch, params)
+      print("Epoch {} ran time: {}".format(
+          epoch, time.time() - epoch_start_time))
+      #if self.params.do_eval:
+      #  acc1 = validate(eval_data_loader, model, criterion, self.params)
 
-    print("Epoch {} ran time: {}".format(
-        epoch, time.time() - epoch_start_time))
-    acc1 = validate(val_loader, model, criterion)
-
-    is_best = acc1 > top_1_acc
-    top_1_acc = max(acc1, top_1_acc)
-    save_checkpoint({
-        'epoch': epoch + 1,
-        'model': params.model,
-        'state_dict': model.state_dict(),
-        'best_acc1': top_1_acc1,
-        'optimizer': optimizer.state_dict(),
-        }, is_best)
-
-  if do_eval:
-    validate(eval_data_loader, model, criterion, params)
+      #  is_best = acc1 > top_1_acc
+      #  top_1_acc = max(acc1, top_1_acc)
+      #  if self.params.model_dir:
+      #    filename = os.path.join(self.params.model_dir, 'checkpoint.ckp')
+      #    save_checkpoint({
+      #      'epoch': epoch + 1,
+      #      'model': self.params.model,
+      #      'state_dict': model.state_dict(),
+      #      'top_1_acc1': top_1_acc,
+      #      'optimizer': optimizer.state_dict(),
+      #      }, is_best, filename)
 
 def train(train_loader, model, criterion, optimizer, epoch, params):
   """Train for one epoch."""
@@ -237,6 +230,7 @@ def train(train_loader, model, criterion, optimizer, epoch, params):
   top1 = AverageMeter()
   top5 = AverageMeter()
 
+  # switch to train mode
   model.train()
 
   end = time.time()
@@ -263,25 +257,24 @@ def train(train_loader, model, criterion, optimizer, epoch, params):
     train_time.update(batch_time.val - data_time.val) 
     end = time.time()
 
-    #print("=" * 30)
-    #print("Epoch: [{0}][{1}/{2}]\n"
-    #      "Time: {batch_time.val: .3f} ({batch_time.avg: .3f})\n"
-    #      "Data: {data_time.val: .3f} ({data_time.avg: .3f})\n"
-    #      "Loss: {loss.val: .4f} ({loss.avg: .4f})\n"
-    #      "Acc@1: {top1.val: .3f} ({top1.avg: .3f})\n"
-    #      "Acc@5: {top5.val: .3f} ({top5.avg: .3f})\n".format(
-    #          epoch, i, len(train_loader), batch_time=batch_time,
-    #          data_time=data_time, loss=losses, top1=top1, top5=top5))
-    average_examples_per_sec_without_data = params.total_batch_size / train_time.avg
-    average_examples_per_sec = params.total_batch_size / batch_time.avg
-    cur_examples_per_sec_without_data = params.total_batch_size / train_time.val
-    cur_examples_per_sec = params.total_batch_size / batch_time.val
-    print("average_examples_per_sec_without_data: {}".format(
-		average_examples_per_sec_without_data))
-    print("average_examples_per_sec: {}".format(average_examples_per_sec))
-    print("cur_examples_per_sec_without_data: {}".format(
-		cur_examples_per_sec_without_data))
-    print("cur_examples_per_sec: {}".format(cur_examples_per_sec))
+    if i % 100 == 0:
+      print("step: {}".format(i))
+    #  print("=" * 30)
+    #  print("Epoch: [{0}][{1}/{2}]\n"
+    #        "Time: {batch_time.val: .3f} ({batch_time.avg: .3f})\n"
+    #        "Data: {data_time.val: .3f} ({data_time.avg: .3f})\n"
+    #        "Loss: {loss.val: .4f} ({loss.avg: .4f})\n"
+    #        "Acc@1: {top1.val: .3f} ({top1.avg: .3f})\n"
+    #        "Acc@5: {top5.val: .3f} ({top5.avg: .3f})\n".format(
+    #            epoch, i, len(train_loader), batch_time=batch_time,
+    #            data_time=data_time, loss=losses, top1=top1, top5=top5))
+    #if i % 500 == 0:
+    #  break
+  average_examples_per_sec_without_data = params.batch_size / train_time.avg
+  average_examples_per_sec = params.batch_size / batch_time.avg
+  print("average_examples_per_sec_without_data: {}".format(
+	average_examples_per_sec_without_data))
+  print("average_examples_per_sec: {}".format(average_examples_per_sec))
 
 def validate(val_loader, model, criterion, params):
   batch_time = AverageMeter()
@@ -299,28 +292,29 @@ def validate(val_loader, model, criterion, params):
       label = label.cuda(0, non_blocking=True)
       
       output = model(inputs)
-      losses = criterion(output, label)
+      loss = criterion(output, label)
 
       acc1, acc5 = accuracy(output, label, topk=(1, 5))
-      losses.update(losses.item(), inputs.size(0))
+      losses.update(loss.item(), inputs.size(0))
       top1.update(acc1[0], inputs.size(0))
       top1.update(acc5[0], inputs.size(0))
 
       batch_time.update(time.time() - end)
-      end = time.end()
-      print("*" * 30)
-      print("Test: [{0}/{1}]\n"
-            "Time: {batch_time.val: .3f} ({batch_time.avg: .3f})\n"
-            "Loss: {loss.val: .4f} ({loss.avg: .4f})\n"
-            "Acc@1: {top1.val: .3f} ({top1.avg: .3f})\n"
-            "Acc@5: {top5.val: .3f} ({top5.avg: .3f})\n".format(
-                i, len(train_loader), batch_time=batch_time,
-                loss=losses, top1=top1, top5=top5))
+      end = time.time()
+      #print("*" * 30)
+      #print("Test: [{0}/{1}]\n"
+      #      "Time: {batch_time.val: .3f} ({batch_time.avg: .3f})\n"
+      #      "Loss: {loss.val: .4f} ({loss.avg: .4f})\n"
+      #      "Acc@1: {top1.val: .3f} ({top1.avg: .3f})\n"
+      #      "Acc@5: {top5.val: .3f} ({top5.avg: .3f})\n".format(
+      #          i, len(val_loader), batch_time=batch_time,
+      #          loss=losses, top1=top1, top5=top5))
 
     print(' * Acc@1 {top1.avg: .3f} Acc@5 {top5.avg: .3f}'
             .format(top1=top1, top5=top5))
+    return top1.avg
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='checkpoint.ckp'):
   torch.save(state, filename)
   if is_best:
     shutil.copyfile(filename, 'model_best.pth.tar')

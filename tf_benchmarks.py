@@ -24,9 +24,9 @@ import json
 try:
   import tensorflow as tf
 except ImportError:
-  print("To run benchmarks for TensoFlow, TensorFlow must be installed.")
-  print("Instructions on how to install TensorFlow can be found in the "
-        "following URL:")
+  print("To run benchmarks for TensoFlow backend, TensorFlow should be "
+        "installed.")
+  print("Instructions for install TensorFlow are as follow:")
   print("  - https://www.tensorflow.org/install")
   raise
 
@@ -43,6 +43,27 @@ def main(params):
   print("Run benchmarks for TensorFlow.")
   tf_version = utils.get_tensorflow_version()
   print('TensorFlow:  %i.%i' % (tf_version[0], tf_version[1]))
+
+  params.all_reduce_spec = False
+  if params.ip_list:
+    ips = params.ip_list.split(',')
+
+    TF_CONFIG = {}
+    addresses = []
+    port = '5001'
+
+    for ip in ips:
+      address = ip + ":" + port
+      addresses.append(address)
+    
+    TF_CONFIG['cluster'] = {'worker' : addresses}
+    TF_CONFIG['task'] = {
+            'type': 'worker',
+            'index': params.job_index,
+    }
+
+    os.environ["TF_CONFIG"] = json.dumps(TF_CONFIG)
+    params.all_reduce_spec = True
 
   if params.model in NLP_MODELS:
     bench = benchmark_nlp.BenchmarkNLP(params)

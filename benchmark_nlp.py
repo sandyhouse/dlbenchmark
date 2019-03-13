@@ -32,16 +32,47 @@ PARAMS_MAP = {
         'big': model_params.BIG_PARAMS,
 }
 
-class TimeHistory(tf.train.SessionRunHook):
-  """Record the run time for each iteration of training/evaluation."""
+class ExamplesPerSecondHook(tf.train.SessionRunHook):
+  """Hook to display examples per second."""
+
+  def __init__(self,
+               batch_size,
+               every_n_steps=100):
+    """Intializer.
+
+    Args:
+      batch_size: Total batch size across all workers.
+      every_n_steps: Display the message every n steps.
+    """
+    self.timer = tf.train.SecondOrStepTimer(every_steps=every_n_steps)
+    self.train_time = 0
+    self.total_steps = 0
+    self.batch_size = batch_size
+    self.examples_per_second_list = []
+    self.average_examples_per_sec = 0
+  
   def begin(self):
-    self.times = []
+    self.global_step = tf.train.get_global_step()
+    if self.global_step == None:
+      raise RuntimeError("Global step must be created before using this hook.")
   
   def before_run(self, run_context):
-    self.time_start = time.time()
+    return tf.train.SessionRunArgs(self.global_step)
   
   def after_run(self, run_context, run_values):
-    self.times.append(time.time() - self.time_start)
+    global_step = run_values.results
+
+    if self.timer.should_trigger_for_step(global_step):
+      elapsed_time, elapsed_steps = self.timer.update_last_triggered_step(
+              global_step)
+      if elapsed_time is not None:
+        self.total_steps += elapsed_steps
+        self.train_time += elapsed_time
+        self.average_examples_per_sec = self.batch_size * (
+            self.total_steps / self.train_time)
+        current_examples_per_sec = self.batch_size * (
+            elapsed_steps / elapsed_time)
+        self.examples_per_second_list.append(current_examples_per_sec)
 
 DEFAULT_TRAIN_EPOCHS = 10
 
@@ -83,7 +114,6 @@ class SquadExample(object):
     if self.start_position:
       s += ", is_impossible: %r" % (self.is_impossible)
     return s
-
 
 class InputFeatures(object):
   """A single set of features of data."""
@@ -997,7 +1027,7 @@ class BenchmarkNLP(object):
     schedule_manager = schedule.Manager(
             train_steps=None,
             steps_between_evals=10,
-            train_epochs=self.params.num_epochs,
+            train_epochs=int(self.params.num_epochs),
             epochs_between_evals=1,
             default_train_epochs=DEFAULT_TRAIN_EPOCHS,
             batch_size=config['batch_size'],
@@ -1009,21 +1039,21 @@ class BenchmarkNLP(object):
     estimator = transformer_helper.construct_estimator(self.params, config, 
             schedule_manager)
 
-    time_hist = TimeHistory()
+    perf_hook = ExamplesPerSecondHook(self.params.batch_size)
 
     transformer_helper.run_loop(
             estimator=estimator,
             # Training arguments
             schedule_manager=schedule_manager,
-            train_hooks=time_hist,
+            train_hooks=perf_hook,
             benchmark_logger=None,
             # BLEU calculation arguments
             bleu_source=self.params.bleu_source,
             bleu_ref=self.params.bleu_ref,
             vocab_file=self.params.vocab_file)
 
-    avg_time = np.mean(time_hist.times)
-    print("{} steps/sec.".format(1.0/avg_time))
+    avg_examples_per_sec = perf_hook.average_examples_per_sec
+    print("{} examples/sec.".format(avg_examples_per_sec))
     tf.logging.info("Completed transformer benchmark.")
   
   def run_bert_squad(self):
@@ -1126,13 +1156,13 @@ class BenchmarkNLP(object):
               drop_remainder=True,
               params=self.params)
 
-      time_hist = TimeHistory()
+      perf_hook = ExamplesPerSecondHook(self.params.batch_size)
 
       estimator.train(input_fn=train_input_fn, max_steps=num_train_steps, 
-              hooks=[time_hist])
+              hooks=[perf_hook])
 
-      avg_time = np.mean(time_hist.times)
-      print("{} steps/sec (avg).".format(1.0/avg_time))
+      avg_examples_per_sec = perf_hook.average_examples_per_sec
+      print("{} examples/sec (avg).".format(avg_examples_per_sec))
 
     if self.params.do_predict:
       eval_examples=read_squad_examples(
@@ -1239,9 +1269,9 @@ class BenchmarkNLP(object):
             vocab_file=self.params.vocab_file,
             do_lower_case=self.params.do_lower_case)
 
-    run_config = tf.estimator.RunConfig(
-            model_dir=self.params.model_dir,
-            save_checkpoints_steps=self.params.save_checkpoints_steps)
+    #run_config = tf.estimator.RunConfig(
+    #        model_dir=self.params.model_dir,
+    #        save_checkpoints_steps=self.params.save_checkpoints_steps)
     
     train_examples = None
     num_train_steps = None
@@ -1265,6 +1295,17 @@ class BenchmarkNLP(object):
             num_train_steps=num_train_steps,
             num_warmup_steps=num_warmup_steps)
 
+    distribution_strategy = utils.get_distribution_strategy(
+            self.num_gpus, self.all_reduce_spec)
+
+    session_config = tf.ConfigProto(allow_soft_placement=True)
+    run_config = tf.estimator.RunConfig(
+            session_config=session_config,
+            save_checkpoints_steps=self.params.save_checkpoints_steps,
+            keep_checkpoint_max=5,
+            train_distribute=distribution_strategy)
+
+
     estimator = tf.estimator.Estimator(
             model_fn=model_fn,
             config=run_config)
@@ -1285,10 +1326,10 @@ class BenchmarkNLP(object):
               drop_remainder=True,
               batch_size=self.params.batch_size)
 
-      time_hist = TimeHistory()
+      perf_hook = ExamplesPerSecondHooke(self.params.batch_size)
 
       estimator.train(input_fn=train_input_fn, max_steps=num_train_steps,
-		hooks=[time_hist])
+		hooks=[perf_hook])
 
       avg_time = np.mean(time_hist.times)
       print("{} steps/sec (avg).".format(1.0/avg_time))

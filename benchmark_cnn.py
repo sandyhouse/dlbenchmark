@@ -28,12 +28,10 @@ from models.cnn import resnet_model as resnet
 from models.cnn import googlenet_model as googlenet
 from models.cnn import vgg_model as vgg
 import imagenet_datasets as datasets
-import cifar10_datasets as cifar10_datasets
 import utils
 
 MODEL_CREATOR = {
         'alexnet': alexnet.AlexnetModel,
-        'alexnet_cifar10': alexnet.AlexnetCifar10Model,
         'resnet50': resnet.create_resnet50_model,
         'googlenet': googlenet.GooglenetModel,
         'vgg16': vgg.Vgg16Model,
@@ -55,7 +53,6 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
     self.train_time = 0
     self.total_steps = 0
     self.batch_size = batch_size
-    self.examples_per_second_list = []
     self.average_examples_per_sec = 0
   
   def begin(self):
@@ -77,26 +74,9 @@ class ExamplesPerSecondHook(tf.train.SessionRunHook):
         self.train_time += elapsed_time
         self.average_examples_per_sec = self.batch_size * (
             self.total_steps / self.train_time)
-        current_examples_per_sec = self.batch_size * (
-            elapsed_steps / elapsed_time)
-        self.examples_per_second_list.append(current_examples_per_sec)
         out_str = "average_examples_per_sec: {}".format(
                   self.average_examples_per_sec)
         tf.logging.info(out_str)
-        out_str = "current_examples_per_sec: {}".format(
-                  current_examples_per_sec)
-        tf.logging.info(out_str)
-
-class TimeHistory(tf.train.SessionRunHook):
-  """Record the run time for each iteration of training/evaluation."""
-  def begin(self):
-    self.times = []
-  
-  def before_run(self, run_context):
-    self.time_start = time.time()
-  
-  def after_run(self, run_context, run_values):
-    self.times.append(time.time() - self.time_start)
 
 def get_optimizer(params, learning_rate):
   """Returns the optimizer that should be used based on params."""
@@ -125,7 +105,7 @@ def get_learning_rate(params, global_step):
 
 def model_fn(features, labels, mode, params):
   """Define how to train, evaluate and predict."""
-  tf.summary.image('images', features, max_outputs=6)
+  #tf.summary.image('images', features, max_outputs=6)
   with tf.variable_scope("model"):
     # Create model and get output logits.
     model = MODEL_CREATOR[params.model](params)
@@ -138,7 +118,7 @@ def model_fn(features, labels, mode, params):
             'probabilities': tf.nn.softmax(logits, name='softmax_tensor'),
     }
 
-    # When in prediction mode, the labels/targets is None. The model output
+    # During in prediction mode, the labels/targets is None. The model output
     # is the prediction.
     if mode == tf.estimator.ModeKeys.PREDICT:
       return tf.estimator.EstimatorSpec(
@@ -168,9 +148,6 @@ def model_fn(features, labels, mode, params):
       optimizer = get_optimizer(params, learning_rate)
 
       train_op = optimizer.minimize(loss, global_step=global_step)
-
-      #update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-      #train_op = tf.group(train_op, update_ops)
 
     accuracy = tf.metrics.accuracy(labels, predictions['classes'])
     accuracy_top_5 = tf.metrics.mean(
@@ -209,8 +186,8 @@ class BenchmarkCNN(object):
     self.batch_size = self.params.batch_size
 
     self.num_gpus = self.params.num_gpus
-    if self.num_gpus:
-      self.batch_size = self.batch_size_per_device * self.params.num_gpus
+    #if self.num_gpus:
+    #  self.batch_size = self.batch_size_per_device * self.params.num_gpus
 
     self.do_train = self.params.do_train
     self.do_eval = self.params.do_eval
@@ -227,17 +204,12 @@ class BenchmarkCNN(object):
     self.adam_beta2 = self.params.adam_beta2
     self.adam_epsilon = self.params.adam_epsilon
     self.use_fp16 = self.params.use_fp16
-    #self.fp16_vars = self.params.fp16_vars
     self.all_reduce_spec = self.params.all_reduce_spec
     self.save_checkpoints_steps = self.params.save_checkpoints_steps
     self.max_chkpts_to_keep = self.params.max_chkpts_to_keep
     self.model_dir = self.params.model_dir
     self.data_format = self.params.data_format
 
-    #if self.use_fp16 and self.fp16_vars:
-    #  self.data_type = tf.float16
-    #else:
-    #  self.data_type = tf.float32
     self.data_type = tf.float16 if self.params.use_fp16 else tf.float32
 
     self.print_info()
@@ -263,7 +235,7 @@ class BenchmarkCNN(object):
     print('Num epochs:  %d' % self.num_epochs)
     print('Data format: %s' % self.data_format)
     print('Optimizer:   %s' % self.optimizer)
-    print('AllReduce:   %s' % self.all_reduce_spec)
+    print('AllReduce:   %s' % 'True' if self.all_reduce_spec else 'False')
     print('=' * 30)
 
   def run(self):
@@ -289,15 +261,10 @@ class BenchmarkCNN(object):
         config=run_config,
         params=self.params)
 
-    use_cifar10 = True if 'cifar10' in self.params.model else False
-
     if self.use_synthetic_data:
       input_function = datasets.get_synth_input_fn(self.data_type)
     else:
-      if use_cifar10:
-        input_function = cifar10_datasets.input_fn
-      else:
-        input_function = datasets.input_fn
+      input_function = datasets.input_fn
 
     def input_fn_train(num_epochs):
       return input_function(
@@ -316,36 +283,28 @@ class BenchmarkCNN(object):
               num_epochs=1,
               dtype=self.data_type)
 
-    for i in xrange(int(self.num_epochs)):
-      train_hook = ExamplesPerSecondHook(self.params.batch_size)
-
-      if self.do_train:
+    if self.do_train:
+      train_hook = ExamplesPerSecondHook(self.batch_size)
+      start_time = time.time()
+      if self.params.ip_list:
+        train_spec = tf.estimator.TrainSpec(input_fn=lambda: input_fn_train(self.num_epochs),
+                                            hooks=[train_hook])
+        #eval_spec = tf.estimator.EvalSpec(input_fn=lambda: input_fn_eval())
+        tf.estimator.train_and_evaluate(classifier, train_spec, None)
+        
+      else:
         classifier.train(input_fn=lambda: input_fn_train(self.num_epochs), 
-                       hooks=[train_hook])
-        total_time = train_hook.train_time
-        print("Totoal time with {} GPU(s): {} seconds.".format(
-            self.num_gpus, total_time))
-        experments_per_sec_list = train_hook.examples_per_second_list
-        #with open(os.path.join(self.params.output_dir, 
-        #    self.params.model + '.txt'), 'w+') as f:
-        #  for experiments_per_sec in experments_per_sec_list:
-        #    line = "experiments_per_sec: " + str(experiments_per_sec) + '\n'
-        #    f.writelines(line)
-        #cur_examples_per_sec = train_hook.examples_per_second_list[
-        #         len(train_hook.examples_per_second_list) - 1]
-        average_examples_per_sec = train_hook.average_examples_per_sec
-        print("Current examples per second: {}.".format(
-            average_examples_per_sec))
+                     hooks=[train_hook])
+      total_time = train_hook.train_time
+      end_time = time.time()
+      print("Totoal time with {} GPU(s): {} seconds.".format(
+          self.num_gpus, total_time))
+      print("Total training time: {} seconds.".format(
+          end_time - start_time))
+      average_examples_per_sec = train_hook.average_examples_per_sec
+      print("Average examples per second: {}.".format(average_examples_per_sec))
 
-        #max_time_index = np.argmax(time_hist.times)
-        #min_time_index = np.argmin(time_hist.times)
-        #max_time = time_hist.times[max_time_index]
-        #min_time = time_hist.times[min_time_index]
-        #avg_time = np.mean(time_hist.times) # per batch
-        #print("{} images/second (avg).".format(self.batch_size/avg_time))
-        #print("{} images/second (max).".format(self.batch_size/max_time))
-        #print("{} images/second (min).".format(self.batch_size/min_time))
-      if self.do_eval:
-        results = classifier.evaluate(input_fn=lambda: input_fn_eval())
-        print("accuracy: {}, accuracy_top_5: {}".format(
-            results['accuracy'], results['accuracy_top_5']))
+    if self.do_eval:
+      results = classifier.evaluate(input_fn=lambda: input_fn_eval())
+      print("accuracy: {}, accuracy_top_5: {}".format(
+          results['accuracy'], results['accuracy_top_5']))
